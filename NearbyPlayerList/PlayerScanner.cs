@@ -100,7 +100,6 @@ public sealed class PlayerScanner
         if (local == null)
             return result;
 
-        var casters = this.config.ShowRaiseInProgress ? this.CollectRaiseCasts() : null;
         var partyIds = this.CollectPartyIds();
         var targetId = Service.Targets.Target?.EntityId ?? 0;
         var softTargetId = Service.Targets.SoftTarget?.EntityId ?? 0;
@@ -110,6 +109,9 @@ public sealed class PlayerScanner
         {
             if (obj is not IPlayerCharacter pc)
                 continue;
+
+            try
+            {
             if (!pc.IsTargetable)
                 continue;
 
@@ -144,16 +146,34 @@ public sealed class PlayerScanner
             };
 
             if (entry.IsDead)
-            {
                 entry.AlreadyRaised = HasRaiseStatus(pc);
-                if (casters != null && casters.TryGetValue(pc.EntityId, out var caster))
-                    entry.RaisedBy = caster;
-            }
 
             if (!this.PassesFilter(entry))
                 continue;
 
             result.Add(entry);
+            }
+            catch (Exception ex)
+            {
+                // Same despawn race as above; HP, statuses and position all read
+                // through the native struct.
+                Service.Log.Verbose(ex, "Skipped a player while building the list.");
+            }
+        }
+
+        // Raise casts only matter when somebody nearby is actually dead. Deferring
+        // this until we know that keeps a full object table walk out of every frame
+        // of normal play, and shrinks the window for the despawn race above.
+        if (this.config.ShowRaiseInProgress && result.Exists(e => e.IsDead))
+        {
+            var casters = this.CollectRaiseCasts();
+            foreach (var entry in result)
+            {
+                if (entry.IsDead && casters.TryGetValue(entry.EntityId, out var caster))
+                    entry.RaisedBy = caster;
+            }
+
+            this.ApplyRaiseFilters(result);
         }
 
         this.Sort(result);
@@ -198,16 +218,28 @@ public sealed class PlayerScanner
         {
             if (obj is not IBattleChara chara)
                 continue;
-            if (!chara.IsCasting)
-                continue;
-            if (!this.raiseActions.Contains(chara.CastActionId))
-                continue;
 
-            var targetId = (uint)chara.CastTargetObjectId;
-            if (targetId == 0 || targetId == 0xE0000000)
-                continue;
+            // Reading cast state dereferences the native struct, and an object can
+            // despawn between the table handing it to us and us reading it. In a raid
+            // there is enough spawn churn for that to happen. One bad object should
+            // cost us that object, not the whole frame.
+            try
+            {
+                if (!chara.IsCasting)
+                    continue;
+                if (!this.raiseActions.Contains(chara.CastActionId))
+                    continue;
 
-            map[targetId] = chara.Name.TextValue;
+                var targetId = (uint)chara.CastTargetObjectId;
+                if (targetId == 0 || targetId == 0xE0000000)
+                    continue;
+
+                map[targetId] = chara.Name.TextValue;
+            }
+            catch (Exception ex)
+            {
+                Service.Log.Verbose(ex, "Skipped an object while scanning for raise casts.");
+            }
         }
 
         return map;
@@ -251,6 +283,21 @@ public sealed class PlayerScanner
             default:
                 return true;
         }
+    }
+
+    /// <summary>
+    /// The in-loop filter can only see the raise status, because who is mid-cast is
+    /// not known until after the list exists. This drops anyone the first pass kept
+    /// who turns out to have a raise already on the way.
+    /// </summary>
+    private void ApplyRaiseFilters(List<PlayerEntry> list)
+    {
+        if (!this.config.FilterIgnoreAlreadyRaised)
+            return;
+        if (this.config.Filter == FilterMode.All)
+            return;
+
+        list.RemoveAll(e => e.IsDead && e.RaisedBy != null);
     }
 
     private void Sort(List<PlayerEntry> list)
@@ -309,6 +356,9 @@ public sealed class PlayerScanner
         _ => 4,
     };
 }
+
+
+
 
 
 
