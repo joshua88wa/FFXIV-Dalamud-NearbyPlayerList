@@ -25,6 +25,7 @@ public sealed class Plugin : IDalamudPlugin
         var scanner = new PlayerScanner(this.config);
         this.listWindow = new ListWindow(this.config, scanner) { IsOpen = this.config.ShowWindow };
         this.configWindow = new ConfigWindow(this.config, this.listWindow);
+        this.listWindow.OpenConfig = this.OpenConfig;
 
         this.windowSystem.AddWindow(this.listWindow);
         this.windowSystem.AddWindow(this.configWindow);
@@ -81,3 +82,4 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 }
+

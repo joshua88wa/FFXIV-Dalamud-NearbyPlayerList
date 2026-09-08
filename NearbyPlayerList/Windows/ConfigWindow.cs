@@ -93,6 +93,30 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
+        var showButtons = this.config.ShowWindowButtons;
+        if (ImGui.Checkbox("Show window buttons", ref showButtons))
+        {
+            this.config.ShowWindowButtons = showButtons;
+            dirty = true;
+        }
+
+        if (showButtons)
+        {
+            ImGui.Indent();
+            TextHint("A small hide, settings and help strip, pinned to the corner the list grows away from. Hovering always works; clicking needs the modifier below, so you cannot hide the list by misclicking next to a player box.");
+
+            ImGui.SetNextItemWidth(220);
+            var mod = (int)this.config.ButtonsRequire;
+            if (ImGui.Combo("Buttons require", ref mod, "Ctrl\0Alt\0No modifier\0"))
+            {
+                this.config.ButtonsRequire = (ButtonModifier)mod;
+                dirty = true;
+            }
+
+            TextHint("Shift is not offered here because it already moves the list.");
+            ImGui.Unindent();
+        }
+
         ImGui.Separator();
 
         // Typed value with step buttons, plus a reset. No slider, because picking an
@@ -459,6 +483,7 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
 
 
 

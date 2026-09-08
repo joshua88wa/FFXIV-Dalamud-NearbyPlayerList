@@ -41,6 +41,9 @@ public sealed class ListWindow : Window
         this.DisableWindowSounds = true;
     }
 
+    /// <summary>Set by the plugin so the settings button can open the config window.</summary>
+    public Action? OpenConfig { get; set; }
+
     public void RequestCenter() => this.centerRequested = true;
 
     public override bool DrawConditions()
@@ -210,6 +213,12 @@ public sealed class ListWindow : Window
             grid[row, col] = this.entries[i];
         }
 
+        var contentWidth = (cols * boxSize.X) + ((cols - 1) * ImGui.GetStyle().ItemSpacing.X);
+        var buttonsFirst = this.config.GrowVertically == VerticalGrowth.Down;
+
+        if (this.config.ShowWindowButtons && buttonsFirst)
+            this.DrawButtonRow(contentWidth, scale);
+
         for (var r = 0; r < rows; r++)
         {
             for (var c = 0; c < cols; c++)
@@ -224,6 +233,9 @@ public sealed class ListWindow : Window
                     this.DrawEntry(entry, boxSize, scale);
             }
         }
+
+        if (this.config.ShowWindowButtons && !buttonsFirst)
+            this.DrawButtonRow(contentWidth, scale);
 
         ImGui.SetWindowFontScale(1f);
     }
@@ -419,6 +431,119 @@ public sealed class ListWindow : Window
         }
     }
 
+    private enum Glyph { Close, Settings, Info }
+
+    private bool ButtonsActive() => this.config.ButtonsRequire switch
+    {
+        ButtonModifier.Ctrl => ImGui.GetIO().KeyCtrl,
+        ButtonModifier.Alt => ImGui.GetIO().KeyAlt,
+        _ => true,
+    };
+
+    /// <summary>
+    /// A small control strip pinned to the same corner the list grows away from, so it
+    /// stays put as players come and go. Hovering always works, so the reminder is
+    /// discoverable, but clicking needs a modifier: these sit next to boxes you click
+    /// constantly, and hiding the list by accident mid-fight would be miserable.
+    /// </summary>
+    private void DrawButtonRow(float contentWidth, float scale)
+    {
+        var size = 16f * scale;
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        var rowWidth = (size * 3f) + (spacing * 2f);
+
+        if (this.config.GrowHorizontally == HorizontalGrowth.Left)
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0f, contentWidth - rowWidth));
+
+        var active = this.ButtonsActive();
+        var modifier = this.config.ButtonsRequire switch
+        {
+            ButtonModifier.Ctrl => "Ctrl",
+            ButtonModifier.Alt => "Alt",
+            _ => null,
+        };
+
+        var gate = modifier == null ? string.Empty : $" Hold {modifier} to use these buttons.";
+
+        if (this.DrawIconButton("npl_close", size, active, Glyph.Close, "Hide the list", "Type /npl to bring it back." + gate))
+        {
+            this.config.ShowWindow = false;
+            this.config.Save();
+        }
+
+        ImGui.SameLine();
+        if (this.DrawIconButton("npl_config", size, active, Glyph.Settings, "Settings", "Same as typing /npl config." + gate))
+            this.OpenConfig?.Invoke();
+
+        ImGui.SameLine();
+        this.DrawIconButton("npl_info", size, active, Glyph.Info, "Moving the list",
+            "Hold Shift and drag from anywhere on the list, including from on top of a player box. /npl center brings it back if it ends up off screen.");
+    }
+
+    private bool DrawIconButton(string id, float size, bool active, Glyph glyph, string title, string body)
+    {
+        if (this.interactive)
+            ImGui.InvisibleButton($"##{id}", new Vector2(size, size));
+        else
+            ImGui.Dummy(new Vector2(size, size));
+
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+        this.hitRects.Add((min, max));
+
+        var hovered = this.interactive && ImGui.IsItemHovered();
+        var clicked = active && hovered && ImGui.IsItemClicked(ImGuiMouseButton.Left);
+
+        var draw = ImGui.GetWindowDrawList();
+
+        if (hovered)
+            draw.AddRectFilled(min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, active ? 0.22f : 0.10f)), 3f);
+
+        var alpha = active ? 0.95f : hovered ? 0.70f : 0.38f;
+        DrawGlyph(draw, glyph, min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, alpha)), size);
+
+        if (hovered)
+        {
+            using var tooltip = ImRaiiTooltip();
+            ImGui.Text(title);
+            ImGui.TextDisabled(body);
+        }
+
+        return clicked;
+    }
+
+    private static void DrawGlyph(ImDrawListPtr draw, Glyph glyph, Vector2 min, Vector2 max, uint color, float size)
+    {
+        var pad = size * 0.28f;
+        var a = min + new Vector2(pad, pad);
+        var b = max - new Vector2(pad, pad);
+        var thickness = Math.Max(1f, size * 0.10f);
+        var center = (min + max) * 0.5f;
+
+        switch (glyph)
+        {
+            case Glyph.Close:
+                draw.AddLine(a, b, color, thickness);
+                draw.AddLine(new Vector2(b.X, a.Y), new Vector2(a.X, b.Y), color, thickness);
+                break;
+
+            case Glyph.Settings:
+                for (var i = 0; i < 3; i++)
+                {
+                    var y = a.Y + ((b.Y - a.Y) * i * 0.5f);
+                    draw.AddLine(new Vector2(a.X, y), new Vector2(b.X, y), color, thickness);
+                }
+
+                break;
+
+            case Glyph.Info:
+                draw.AddCircle(center, (size * 0.5f) - pad + (size * 0.10f), color, 0, thickness);
+                draw.AddLine(new Vector2(center.X, center.Y - (size * 0.14f)), new Vector2(center.X, center.Y + (size * 0.16f)), color, thickness);
+                draw.AddCircleFilled(new Vector2(center.X, center.Y - (size * 0.24f)), thickness * 0.6f, color);
+                break;
+        }
+    }
+
     private static Vector4 RoleColor(byte role) => role switch
     {
         1 => new Vector4(0.20f, 0.48f, 0.85f, 1f),   // tank
@@ -444,6 +569,9 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
+
 
 
 

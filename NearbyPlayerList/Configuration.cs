@@ -13,6 +13,7 @@ public enum SortMode { Role, Alphabetical, MissingHp }
 public enum FilterMode { All, BelowHealthThreshold, DeadOnly }
 public enum HideCondition { Never, InCombat, OutOfCombat, WeaponDrawn, WeaponSheathed }
 public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget }
+public enum ButtonModifier { Ctrl, Alt, None }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -22,6 +23,8 @@ public class Configuration : IPluginConfiguration
     // Window
     public bool ShowWindow = true;
     public bool LockPosition = false;
+    public bool ShowWindowButtons = true;
+    public ButtonModifier ButtonsRequire = ButtonModifier.Ctrl;
     public float Scale = 1.0f;
     public int MaxPlayers = 0;                 // 0 = unlimited
     public HideCondition HideWhen = HideCondition.Never;
@@ -92,6 +95,7 @@ public class Configuration : IPluginConfiguration
         this.Save();
     }
 }
+
 
 
 
