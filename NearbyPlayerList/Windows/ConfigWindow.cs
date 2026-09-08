@@ -122,6 +122,15 @@ public sealed class ConfigWindow : Window
                 dirty = true;
             }
 
+            var filters = this.config.ShowFilterButtons;
+            if (ImGui.Checkbox("Show filter mode buttons", ref filters))
+            {
+                this.config.ShowFilterButtons = filters;
+                dirty = true;
+            }
+
+            TextHint("Adds A, ! and a skull to the strip for show all, show the hurt, and show only the dead. The current mode is highlighted. They sit in their own group, separated by a gap from the window buttons.");
+
             TextHint(keep
                 ? "Hiding the list leaves the buttons behind, so the first one becomes a show and hide toggle. Useful for dropping the list in a dungeon and bringing it back for a FATE without typing a command."
                 : "Hiding the list hides the buttons with it, so /npl is the only way back.");
@@ -495,6 +504,7 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
 
 
 

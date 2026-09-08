@@ -142,8 +142,8 @@ public sealed class ListWindow : Window
         var spacing = ImGui.GetStyle().ItemSpacing;
         var chrome = pad * 2f;
 
-        var stripHeight = 16f * scale;
-        var stripWidth = (16f * scale * 3f) + (spacing.X * 2f);
+        var stripHeight = this.StripHeight(scale);
+        var stripWidth = this.StripWidth(scale);
         var showStrip = this.config.ShowWindowButtons;
 
         if (!this.config.ShowWindow || this.entries.Count == 0)
@@ -492,7 +492,7 @@ public sealed class ListWindow : Window
         }
     }
 
-    private enum Glyph { Close, Show, Settings, Info }
+    private enum Glyph { Close, Show, Settings, Info, FilterAll, FilterHurt, FilterDead }
 
     private bool ButtonsActive() => this.config.ButtonsRequire switch
     {
@@ -507,16 +507,61 @@ public sealed class ListWindow : Window
     /// discoverable, but clicking needs a modifier: these sit next to boxes you click
     /// constantly, and hiding the list by accident mid-fight would be miserable.
     /// </summary>
+    private float StripHeight(float scale) => 16f * scale;
+
+    private float StripWidth(float scale)
+    {
+        var size = this.StripHeight(scale);
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        var width = (size * 3f) + (spacing * 2f);
+
+        if (this.config.ShowFilterButtons && this.config.ShowWindow)
+            width += (size * 0.75f) + (size * 3f) + (spacing * 2f);
+
+        return width;
+    }
+
+    /// <summary>
+    /// A control strip pinned to the same corner the list grows away from. The window
+    /// buttons always sit against that corner and the filter buttons hang off the
+    /// inside edge, so the hide button never moves when the filter group appears or
+    /// disappears.
+    /// </summary>
     private void DrawButtonRow(float contentWidth, float scale)
     {
-        var size = 16f * scale;
-        var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var rowWidth = (size * 3f) + (spacing * 2f);
+        var size = this.StripHeight(scale);
+        var rowWidth = this.StripWidth(scale);
+        var gap = size * 0.75f;
 
-        if (this.config.GrowHorizontally == HorizontalGrowth.Left)
+        var pinnedLeft = this.config.GrowHorizontally == HorizontalGrowth.Right;
+        if (!pinnedLeft)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0f, contentWidth - rowWidth));
 
-        var active = this.ButtonsActive();
+        var showFilters = this.config.ShowFilterButtons && this.config.ShowWindow;
+
+        if (pinnedLeft)
+        {
+            this.DrawWindowButtons(size);
+            if (showFilters)
+            {
+                ImGui.SameLine(0f, gap);
+                this.DrawFilterButtons(size);
+            }
+        }
+        else
+        {
+            if (showFilters)
+            {
+                this.DrawFilterButtons(size);
+                ImGui.SameLine(0f, gap);
+            }
+
+            this.DrawWindowButtons(size);
+        }
+    }
+
+    private string ModifierHint()
+    {
         var modifier = this.config.ButtonsRequire switch
         {
             ButtonModifier.Ctrl => "Ctrl",
@@ -524,10 +569,14 @@ public sealed class ListWindow : Window
             _ => null,
         };
 
-        var gate = modifier == null ? string.Empty : $" Hold {modifier} to use these buttons.";
+        return modifier == null ? string.Empty : $" Hold {modifier} to use these buttons.";
+    }
 
+    private void DrawWindowButtons(float size)
+    {
+        var active = this.ButtonsActive();
+        var gate = this.ModifierHint();
         var hidden = !this.config.ShowWindow;
-        var restorable = this.config.KeepButtonsWhenHidden;
 
         if (this.DrawIconButton(
                 "npl_close",
@@ -537,7 +586,7 @@ public sealed class ListWindow : Window
                 hidden ? "Show the list" : "Hide the list",
                 hidden
                     ? "Brings the player list back." + gate
-                    : (restorable
+                    : (this.config.KeepButtonsWhenHidden
                         ? "Leaves these buttons behind so you can bring it back." + gate
                         : "Type /npl to bring it back." + gate)))
         {
@@ -554,7 +603,34 @@ public sealed class ListWindow : Window
             "Hold Shift and drag from anywhere on the list, including from on top of a player box. /npl center brings it back if it ends up off screen.");
     }
 
-    private bool DrawIconButton(string id, float size, bool active, Glyph glyph, string title, string body)
+    private void DrawFilterButtons(float size)
+    {
+        var active = this.ButtonsActive();
+        var gate = this.ModifierHint();
+        var threshold = (int)Math.Round(this.config.HealthThreshold * 100f);
+
+        if (this.DrawIconButton("npl_f_all", size, active, Glyph.FilterAll, "Show all players",
+                "No filtering." + gate, this.config.Filter == FilterMode.All))
+            this.SetFilter(FilterMode.All);
+
+        ImGui.SameLine();
+        if (this.DrawIconButton("npl_f_hurt", size, active, Glyph.FilterHurt, "Show the hurt",
+                $"Only players at or below {threshold}% health. Dead players are below any threshold, so they show here too." + gate,
+                this.config.Filter == FilterMode.BelowHealthThreshold))
+            this.SetFilter(FilterMode.BelowHealthThreshold);
+
+        ImGui.SameLine();
+        if (this.DrawIconButton("npl_f_dead", size, active, Glyph.FilterDead, "Show only the dead",
+                "The raising mode." + gate, this.config.Filter == FilterMode.DeadOnly))
+            this.SetFilter(FilterMode.DeadOnly);
+    }
+
+    private void SetFilter(FilterMode mode)
+    {
+        this.config.Filter = mode;
+        this.config.Save();
+    }
+    private bool DrawIconButton(string id, float size, bool active, Glyph glyph, string title, string body, bool selected = false)
     {
         if (this.interactive)
             ImGui.InvisibleButton($"##{id}", new Vector2(size, size));
@@ -570,10 +646,12 @@ public sealed class ListWindow : Window
 
         var draw = ImGui.GetWindowDrawList();
 
-        if (hovered)
+        if (selected)
+            draw.AddRectFilled(min, max, ImGui.GetColorU32(new Vector4(0.30f, 0.55f, 0.90f, 0.75f)), 3f);
+        else if (hovered)
             draw.AddRectFilled(min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, active ? 0.22f : 0.10f)), 3f);
 
-        var alpha = active ? 0.95f : hovered ? 0.70f : 0.38f;
+        var alpha = selected || active ? 0.95f : hovered ? 0.70f : 0.38f;
         DrawGlyph(draw, glyph, min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, alpha)), size);
 
         if (hovered)
@@ -626,9 +704,42 @@ public sealed class ListWindow : Window
                 draw.AddLine(new Vector2(center.X, center.Y - (size * 0.14f)), new Vector2(center.X, center.Y + (size * 0.16f)), color, thickness);
                 draw.AddCircleFilled(new Vector2(center.X, center.Y - (size * 0.24f)), thickness * 0.6f, color);
                 break;
+
+            case Glyph.FilterAll:
+                DrawGlyphText(draw, "A", center, color, size);
+                break;
+
+            case Glyph.FilterHurt:
+                DrawGlyphText(draw, "!", center, color, size);
+                break;
+
+            case Glyph.FilterDead:
+                // Drawn rather than typed. The default font has no dependable skull
+                // glyph, and an emoji would not match the rest of the strip.
+                var socket = ImGui.GetColorU32(new Vector4(0.05f, 0.05f, 0.07f, 1f));
+                draw.AddCircleFilled(center - new Vector2(0f, size * 0.06f), size * 0.25f, color);
+                draw.AddRectFilled(
+                    center + new Vector2(-size * 0.13f, size * 0.10f),
+                    center + new Vector2(size * 0.13f, size * 0.26f),
+                    color,
+                    size * 0.06f);
+                draw.AddCircleFilled(center + new Vector2(-size * 0.10f, -size * 0.08f), size * 0.07f, socket);
+                draw.AddCircleFilled(center + new Vector2(size * 0.10f, -size * 0.08f), size * 0.07f, socket);
+                break;
         }
     }
 
+    /// <summary>
+    /// Glyph text is drawn at an explicit size rather than the window font size, so a
+    /// letter always fits its button box whatever the list scale is.
+    /// </summary>
+    private static void DrawGlyphText(ImDrawListPtr draw, string label, Vector2 center, uint color, float size)
+    {
+        var font = ImGui.GetFont();
+        var fontSize = size * 0.82f;
+        var measured = ImGui.CalcTextSize(label) * (fontSize / ImGui.GetFontSize());
+        draw.AddText(font, fontSize, center - (measured * 0.5f), color, label);
+    }
     private static Vector4 RoleColor(byte role) => role switch
     {
         1 => new Vector4(0.20f, 0.48f, 0.85f, 1f),   // tank
@@ -654,6 +765,12 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
+
+
+
+
 
 
 
