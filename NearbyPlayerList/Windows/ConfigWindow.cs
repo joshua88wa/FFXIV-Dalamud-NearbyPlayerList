@@ -66,9 +66,6 @@ public sealed class ConfigWindow : Window
     {
         var dirty = false;
 
-        TextHint("Moving the list: hold Shift and drag it from anywhere, including from on top of a player box. While Shift is held the boxes stop taking clicks, so you cannot target someone by accident while repositioning. Everything except the boxes is click-through, so the list never eats a click meant for the game.");
-        ImGui.Separator();
-
         var show = this.config.ShowWindow;
         if (ImGui.Checkbox("Show the player list", ref show))
         {
@@ -100,11 +97,11 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
+        HelpMarker("A hide, settings and help strip pinned to the corner the list grows away from. Hovering always works; clicking needs the modifier below, so you cannot hide the list by misclicking next to a player box.");
+
         if (showButtons)
         {
             ImGui.Indent();
-            TextHint("A small hide, settings and help strip, pinned to the corner the list grows away from. Hovering always works; clicking needs the modifier below, so you cannot hide the list by misclicking next to a player box.");
-
             ImGui.SetNextItemWidth(220);
             var mod = (int)this.config.ButtonsRequire;
             if (ImGui.Combo("Buttons require", ref mod, "Ctrl\0Alt\0No modifier\0"))
@@ -113,7 +110,8 @@ public sealed class ConfigWindow : Window
                 dirty = true;
             }
 
-            TextHint("Shift is not offered here because it already moves the list.");
+            HelpMarker("Shift is not offered here because it already moves the list.");
+
 
             var keep = this.config.KeepButtonsWhenHidden;
             if (ImGui.Checkbox("Keep the buttons when the list is hidden", ref keep))
@@ -122,6 +120,10 @@ public sealed class ConfigWindow : Window
                 dirty = true;
             }
 
+            HelpMarker(keep
+                ? "Hiding the list leaves the buttons behind, so the first one becomes a show and hide toggle. Useful for dropping the list in a dungeon and bringing it back for a FATE without typing a command."
+                : "Hiding the list hides the buttons with it, so /npl is the only way back.");
+
             var filters = this.config.ShowFilterButtons;
             if (ImGui.Checkbox("Show filter mode buttons", ref filters))
             {
@@ -129,19 +131,15 @@ public sealed class ConfigWindow : Window
                 dirty = true;
             }
 
-            TextHint("Adds A, ! and a skull to the strip for show all, show the hurt, and show only the dead. The current mode is highlighted. They sit in their own group, separated by a gap from the window buttons.");
-
-            TextHint(keep
-                ? "Hiding the list leaves the buttons behind, so the first one becomes a show and hide toggle. Useful for dropping the list in a dungeon and bringing it back for a FATE without typing a command."
-                : "Hiding the list hides the buttons with it, so /npl is the only way back.");
+            HelpMarker("Adds A, ! and a skull to the strip for show all, show the hurt, and show only the dead. The current mode is highlighted, in its own group separated from the window buttons.");
 
             ImGui.Unindent();
         }
 
         ImGui.Separator();
 
-        // Typed value with step buttons, plus a reset. No slider, because picking an
-        // exact number on a slider is fiddly.
+        // Typed with step buttons rather than a slider: landing on an exact value with a
+        // slider is fiddly.
         var scalePercent = (int)Math.Round(this.config.Scale * 100f);
         ImGui.SetNextItemWidth(160);
         if (ImGui.InputInt("Scale (%)", ref scalePercent, 5, 25))
@@ -174,7 +172,7 @@ public sealed class ConfigWindow : Window
         if (ImGui.Button("Center player list"))
             this.list.RequestCenter();
 
-        TextHint("Use this if the window ends up off screen. The command /npl center does the same thing.");
+        HelpMarker("Use this if the window ends up off screen. The command /npl center does the same thing.");
 
         ImGui.Spacing();
 
@@ -223,9 +221,6 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
-        ImGui.TextWrapped("Growth direction pins one corner of the list. The first player sits in that corner and later ones fill away from it, so boxes you have already learned the position of do not move when someone new shows up.");
-        ImGui.Spacing();
-
         ImGui.SetNextItemWidth(220);
         var growH = (int)this.config.GrowHorizontally;
         if (ImGui.Combo("Expand horizontally", ref growH, "To the right\0To the left\0"))
@@ -242,9 +237,9 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
-        TextHint(this.config.Orientation == ListOrientation.Vertical
-            ? "Vertical lists add new columns, so the horizontal setting is the one that matters most."
-            : "Horizontal lists add new rows, so the vertical setting is the one that matters most.");
+        HelpMarker(this.config.Orientation == ListOrientation.Vertical
+            ? "These pin one corner of the list; the first player sits in it and later ones fill away from it. Vertical lists add new columns, so the horizontal setting is the one that matters most."
+            : "These pin one corner of the list; the first player sits in it and later ones fill away from it. Horizontal lists add new rows, so the vertical setting is the one that matters most.");
 
         ImGui.Separator();
 
@@ -255,7 +250,7 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
-        TextHint("Changes the label written on top of each HP bar, from 75% to 12,345 / 16,000. The bar itself is unaffected, and dead players show their raise state either way.");
+        HelpMarker("Changes the label written on top of each HP bar, from 75% to 12,345 / 16,000. The bar itself is unaffected, and dead players show their raise state either way.");
 
         return dirty;
     }
@@ -386,7 +381,7 @@ public sealed class ConfigWindow : Window
             if (partyTop)
             {
                 ImGui.Indent();
-                TextHint("You count as party for this, including when solo.");
+                HelpMarker("You count as party for this, including when solo.");
 
                 var selfFirst = this.config.SelfAboveParty;
                 if (ImGui.Checkbox("Yourself above other party members", ref selfFirst))
@@ -426,10 +421,8 @@ public sealed class ConfigWindow : Window
     {
         var dirty = false;
 
-        ImGui.TextWrapped("Highlighting shows which player you already have selected. The border colour is drawn around the box, and optionally blended into its background.");
-        ImGui.Spacing();
-
         dirty |= DrawHighlight("Highlight your target", ref this.config.HighlightTarget, ref this.config.TargetColor, "target");
+        HelpMarker("Shows which player you already have selected. The colour is drawn as a border around the box, and optionally blended into its background.");
         dirty |= DrawHighlight("Highlight your soft target", ref this.config.HighlightSoftTarget, ref this.config.SoftTargetColor, "soft");
         dirty |= DrawHighlight("Highlight your focus target", ref this.config.HighlightFocusTarget, ref this.config.FocusTargetColor, "focus");
         dirty |= DrawHighlight("Highlight party members", ref this.config.HighlightParty, ref this.config.PartyColor, "party");
@@ -441,7 +434,7 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
-        TextHint("If a player is both your soft target and your hard target, the soft target colour is drawn outside and the target colour inside.");
+        HelpMarker("If a player is both your soft target and your hard target, the soft target colour is drawn outside and the target colour inside.");
 
         ImGui.Separator();
 
@@ -476,10 +469,23 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 
-    /// <summary>
-    /// ImGui.TextDisabled does not wrap, so longer hints ran off the edge of the
-    /// settings window and got clipped.
-    /// </summary>
+    // A dim (?) that reveals its explanation on hover, so the settings stay a scannable
+    // list of controls instead of a wall of prose.
+    private static void HelpMarker(string text)
+    {
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (!ImGui.IsItemHovered())
+            return;
+
+        ImGui.BeginTooltip();
+        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 24f);
+        ImGui.TextWrapped(text);
+        ImGui.PopTextWrapPos();
+        ImGui.EndTooltip();
+    }
+
+    // ImGui.TextDisabled does not wrap.
     private static void TextHint(string text)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
@@ -504,6 +510,12 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
+
+
+
+
+
 
 
 

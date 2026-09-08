@@ -75,13 +75,9 @@ public class Configuration : IPluginConfiguration
 
     public void Save() => this.pluginInterface?.SavePluginConfig(this);
 
-    /// <summary>
-    /// Copies every saved setting back to its default. Done by reflection over the
-    /// public fields rather than by hand, so a setting added later cannot be forgotten
-    /// here. The plugin interface field is private and non-serialised, so it is not
-    /// touched, and the object identity is preserved because the windows and the
-    /// scanner all hold a reference to this same instance.
-    /// </summary>
+    // Reflection over the public fields rather than a hand-written list, so a setting
+    // added later cannot be missed. Mutates in place because the windows and the
+    // scanner all hold a reference to this instance.
     public void ResetToDefaults()
     {
         var defaults = new Configuration();

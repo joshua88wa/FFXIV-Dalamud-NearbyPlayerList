@@ -21,11 +21,8 @@ public sealed class ListWindow : Window
     private bool dragLatch;
     private bool interactive = true;
 
-    /// <summary>
-    /// The screen point the list is pinned to. ImGui anchors auto-resizing windows by
-    /// their top left corner, so growth is down and to the right unless we pin a
-    /// different corner and let ImGui place the window relative to it.
-    /// </summary>
+    // Screen point the list is pinned to. ImGui positions windows by their top left,
+    // so holding any other corner means repositioning every frame.
     private Vector2? anchor;
 
     private Vector2 Pivot => new(
@@ -41,7 +38,7 @@ public sealed class ListWindow : Window
         this.DisableWindowSounds = true;
     }
 
-    /// <summary>Set by the plugin so the settings button can open the config window.</summary>
+    // Set by the plugin so the settings button can open the config window.
     public Action? OpenConfig { get; set; }
 
     public void RequestCenter() => this.centerRequested = true;
@@ -96,25 +93,20 @@ public sealed class ListWindow : Window
         }
         else if (this.anchor.HasValue && !ImGui.GetIO().KeyShift)
         {
-            // Not applied while shift is held, otherwise re-pinning the window every
-            // frame would cancel out the drag before it could take effect.
+            // Skipped while shift is held; re-pinning every frame would cancel the drag.
             ImGui.SetNextWindowPos(this.anchor.Value, ImGuiCond.Always, this.Pivot);
         }
 
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(2, 2));
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(2, 2));
 
-        // ImGui clamps windows to style.WindowMinSize, 32x32 by default. The collapsed
-        // strip is shorter than that, so ImGui was quietly enlarging the window while
-        // we positioned it using the size we asked for, putting the pinned edge about
-        // twelve pixels out. Auto-resizing windows skip this clamp, which is why the
-        // problem only appeared once we started sizing the window ourselves.
+        // ImGui clamps every window to style.WindowMinSize, 32x32 by default, which is
+        // larger than the collapsed strip. Auto-resizing windows skip the clamp,
+        // explicitly sized ones do not.
         ImGui.PushStyleVar(ImGuiStyleVar.WindowMinSize, new Vector2(1, 1));
 
-        // Sized explicitly rather than with AlwaysAutoResize. Auto-resize fits the
-        // window to the PREVIOUS frame's content, which is invisible when the top left
-        // is pinned but makes the pinned corner jump by the height difference every
-        // time the player count changes when the bottom or right edge is pinned.
+        // Sized explicitly rather than with AlwaysAutoResize, which fits the window to the
+        // previous frame's content. That lag offsets any pinned corner except the top left.
         ImGui.SetNextWindowSize(this.CalcWindowSize(), ImGuiCond.Always);
     }
 
@@ -170,12 +162,8 @@ public sealed class ListWindow : Window
 
     public override void PostDraw() => ImGui.PopStyleVar(3);
 
-    /// <summary>
-    /// ImGui hit testing is rectangular, so "click through the gaps" is done by
-    /// dropping input for the whole window on frames where the cursor is not over
-    /// one of last frame's player boxes. Holding shift re-enables input so the
-    /// window can still be dragged by its empty space.
-    /// </summary>
+    // ImGui hit testing is rectangular, so click-through is done by dropping input for
+    // the whole window on frames where the cursor is not over a player box.
     private bool ShouldAcceptInput()
     {
         var io = ImGui.GetIO();
@@ -207,23 +195,19 @@ public sealed class ListWindow : Window
 
     public override void Draw()
     {
-        // Re-derive the pinned corner from wherever the window actually ended up, so a
-        // drag, a centre, or a change of growth direction all just work.
+        // Re-derive the pinned corner from where the window actually ended up.
         this.anchor = ImGui.GetWindowPos() + (ImGui.GetWindowSize() * this.Pivot);
 
         this.hitRects.Clear();
 
-        // Holding shift turns the boxes into non-interactive items for this frame.
-        // With click-through on, the real empty space is only the couple of pixels
-        // between boxes, which is not something anyone can reliably grab, so shift
-        // makes the entire window draggable instead.
+        // Shift makes the boxes non-interactive for this frame. Click-through leaves only a
+        // couple of pixels of grabbable space, so shift makes the whole window draggable.
         this.interactive = !ImGui.GetIO().KeyShift;
 
         var scale = Math.Clamp(this.config.Scale, 0.25f, 4f);
         ImGui.SetWindowFontScale(scale);
 
-        // Collapsed: the strip alone stands in for the list, and its first button
-        // restores it. Also covers the case where the list is on but nobody is nearby.
+        // Collapsed, or nobody nearby: the strip stands in for the list.
         if (!this.config.ShowWindow || this.entries.Count == 0)
         {
             if (this.config.ShowWindowButtons)
@@ -235,22 +219,15 @@ public sealed class ListWindow : Window
             return;
         }
 
-        // Height is derived from the font rather than fixed, so the HP bar is always
-        // tall enough to hold its own label. With the old fixed 34px box the bar came
-        // out around 10px tall and the label was silently dropped, which made the
-        // "show HP numbers" setting look like it did nothing.
-        // Same helpers the window size calculation uses, so layout and size cannot
-        // drift apart and clip the last row.
+        // Box height derives from the font so the HP bar can always fit its own label.
+        // Same helpers as CalcWindowSize, so layout and size cannot drift apart.
         var boxSize = CalcBoxSize(scale, ImGui.GetTextLineHeight());
         var line = Math.Max(1, this.config.LineLength);
         var count = this.entries.Count;
         var (cols, rows) = this.CalcGrid(count);
 
-        // Entries are placed into a grid rather than drawn straight down the list, so
-        // that the growth direction can flip which end of the grid gets filled first.
-        // The first player always sits in the pinned corner and later ones fill away
-        // from it, which is the whole point of choosing a direction: the boxes you have
-        // already learned the position of do not move when someone new shows up.
+        // Entries go into a grid so the growth direction can flip which end fills first.
+        // The first player sits in the pinned corner and later ones fill away from it.
         var grid = new PlayerEntry?[rows, cols];
         for (var i = 0; i < count; i++)
         {
@@ -325,9 +302,7 @@ public sealed class ListWindow : Window
         var draw = ImGui.GetWindowDrawList();
         var rounding = 4f * scale;
 
-        // Selection state first, since that is the thing you most need to spot at a
-        // glance. Soft target outranks the hard target here because it is what an
-        // action will actually land on when both are set.
+        // Soft target outranks hard target: it is what an action lands on when both are set.
         Vector4? highlight = null;
         if (this.config.HighlightSoftTarget && entry.IsSoftTarget)
             highlight = this.config.SoftTargetColor;
@@ -361,8 +336,7 @@ public sealed class ListWindow : Window
         if (highlight.HasValue)
             rings.Add((highlight.Value, 2.5f));
 
-        // A box can be both the soft target and the hard target. Show the second one
-        // as an inner ring rather than dropping it.
+        // A box can be both soft and hard target; show the second as an inner ring.
         if (this.config.HighlightTarget && entry.IsTarget && highlight.HasValue && highlight.Value != this.config.TargetColor)
             rings.Add((this.config.TargetColor, 2f));
 
@@ -401,8 +375,6 @@ public sealed class ListWindow : Window
             ? new Vector4(0.75f, 0.75f, 0.75f, 1f)
             : new Vector4(1f, 1f, 1f, 1f);
         draw.AddText(new Vector2(textLeft, min.Y + pad), ImGui.GetColorU32(nameColor), entry.Name);
-
-        // HP bar
         var barMin = new Vector2(textLeft, min.Y + pad + lineHeight + (1f * scale));
         var barMax = new Vector2(max.X - pad, max.Y - pad);
         if (barMax.Y > barMin.Y && barMax.X > barMin.X)
@@ -458,17 +430,13 @@ public sealed class ListWindow : Window
         var barHeight = barMax.Y - barMin.Y;
         var pos = new Vector2(barMin.X + (3f * scale), barMin.Y + ((barHeight - textSize.Y) * 0.5f));
 
-        // Drawn with a shadow rather than gated on fitting, so it stays readable over
-        // both the filled and unfilled parts of the bar.
+        // Shadowed so the label stays readable over both the filled and empty bar.
         draw.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.8f)), label);
         draw.AddText(pos, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.95f)), label);
     }
 
-    /// <summary>
-    /// Icons are drawn as the game authored them. Role colour is carried by the HP bar
-    /// instead: the 62100 icon set has plenty of colour of its own, and multiplying a
-    /// role colour over it only muddies the artwork without adding information.
-    /// </summary>
+    // Icons are drawn untinted. The 62100 set carries its own colour, and multiplying a
+    // role colour over it muddies the art; role is conveyed by the HP bar instead.
     private static void DrawJobIcon(ImDrawListPtr draw, PlayerEntry entry, Vector2 min, Vector2 max, float scale)
     {
         var tint = entry.IsDead
@@ -501,12 +469,6 @@ public sealed class ListWindow : Window
         _ => true,
     };
 
-    /// <summary>
-    /// A small control strip pinned to the same corner the list grows away from, so it
-    /// stays put as players come and go. Hovering always works, so the reminder is
-    /// discoverable, but clicking needs a modifier: these sit next to boxes you click
-    /// constantly, and hiding the list by accident mid-fight would be miserable.
-    /// </summary>
     private float StripHeight(float scale) => 16f * scale;
 
     private float StripWidth(float scale)
@@ -521,12 +483,8 @@ public sealed class ListWindow : Window
         return width;
     }
 
-    /// <summary>
-    /// A control strip pinned to the same corner the list grows away from. The window
-    /// buttons always sit against that corner and the filter buttons hang off the
-    /// inside edge, so the hide button never moves when the filter group appears or
-    /// disappears.
-    /// </summary>
+    // Window buttons sit against the pinned corner and filter buttons hang off the
+    // inside edge, so the hide button does not move when the filter group appears.
     private void DrawButtonRow(float contentWidth, float scale)
     {
         var size = this.StripHeight(scale);
@@ -657,8 +615,7 @@ public sealed class ListWindow : Window
         if (hovered)
         {
             using var tooltip = ImRaiiTooltip();
-            // ImGui.TextDisabled does not wrap, so the body ran out into one very wide
-            // line and dragged the whole tooltip out with it.
+            // ImGui.TextDisabled does not wrap.
             ImGui.PushTextWrapPos(ImGui.GetFontSize() * 18f);
             ImGui.TextUnformatted(title);
             ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
@@ -714,8 +671,7 @@ public sealed class ListWindow : Window
                 break;
 
             case Glyph.FilterDead:
-                // Drawn rather than typed. The default font has no dependable skull
-                // glyph, and an emoji would not match the rest of the strip.
+                // Drawn rather than typed: the default font has no dependable skull glyph.
                 var socket = ImGui.GetColorU32(new Vector4(0.05f, 0.05f, 0.07f, 1f));
                 draw.AddCircleFilled(center - new Vector2(0f, size * 0.06f), size * 0.25f, color);
                 draw.AddRectFilled(
@@ -729,10 +685,7 @@ public sealed class ListWindow : Window
         }
     }
 
-    /// <summary>
-    /// Glyph text is drawn at an explicit size rather than the window font size, so a
-    /// letter always fits its button box whatever the list scale is.
-    /// </summary>
+    // Explicit font size so a letter always fits its button box at any list scale.
     private static void DrawGlyphText(ImDrawListPtr draw, string label, Vector2 center, uint color, float size)
     {
         var font = ImGui.GetFont();
@@ -765,6 +718,7 @@ public sealed class ListWindow : Window
         }
     }
 }
+
 
 
 

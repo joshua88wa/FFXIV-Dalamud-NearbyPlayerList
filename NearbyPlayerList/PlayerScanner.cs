@@ -41,10 +41,8 @@ public sealed class PlayerScanner
     // No code from that project is used here; this is an independent implementation.
     private static readonly uint[] RaiseStatusIds = { 148, 1140 };
 
-    // Known player raise actions. The set is also extended at load time with every
-    // player action the game marks as able to target the dead, so job actions added
-    // in later patches (including Field Operation / Phantom Job raises) are picked up
-    // without a code change.
+    // Seeded with the six job raises, then extended at load from the Action sheet so
+    // later patches and duty variants are picked up without a code change.
     private static readonly uint[] KnownRaiseActions =
     {
         125,    // Raise (WHM/CNJ)
@@ -76,12 +74,10 @@ public sealed class PlayerScanner
             {
                 if (row.RowId == 0)
                     continue;
-                // DeadTargetBehaviour == 1 marks actions that can be used on a corpse.
-                // Verified against the 7.5 Action sheet: it selects the six job raises
-                // plus their duty/Field Operation variants, including Occult Raise,
-                // Phoenix Down and Variant Raise, and nothing else of consequence.
-                // Note that those variants are NOT flagged IsPlayerAction, so filtering
-                // on that would miss the Occult Crescent case entirely.
+                // DeadTargetBehaviour == 1 marks actions usable on a corpse. It selects the job
+                // raises plus duty and Field Operation variants such as Occult Raise, Variant
+                // Raise and Phoenix Down. Those variants are NOT flagged IsPlayerAction, so
+                // filtering on that would miss the Occult Crescent case.
                 if (row.DeadTargetBehaviour == 1)
                     this.raiseActions.Add(row.RowId);
             }
@@ -155,15 +151,14 @@ public sealed class PlayerScanner
             }
             catch (Exception ex)
             {
-                // Same despawn race as above; HP, statuses and position all read
+                // Same despawn race as CollectRaiseCasts; HP, statuses and position all read
                 // through the native struct.
                 Service.Log.Verbose(ex, "Skipped a player while building the list.");
             }
         }
 
-        // Raise casts only matter when somebody nearby is actually dead. Deferring
-        // this until we know that keeps a full object table walk out of every frame
-        // of normal play, and shrinks the window for the despawn race above.
+        // Only walk the object table for casts when somebody nearby is dead. Keeps a full
+        // table walk out of normal play and shrinks the window for the despawn race.
         if (this.config.ShowRaiseInProgress && result.Exists(e => e.IsDead))
         {
             var casters = this.CollectRaiseCasts();
@@ -219,10 +214,9 @@ public sealed class PlayerScanner
             if (obj is not IBattleChara chara)
                 continue;
 
-            // Reading cast state dereferences the native struct, and an object can
-            // despawn between the table handing it to us and us reading it. In a raid
-            // there is enough spawn churn for that to happen. One bad object should
-            // cost us that object, not the whole frame.
+            // Reading cast state dereferences the native struct, and an object can despawn
+            // between the table handing it over and the read. One bad object should cost that
+            // object, not the whole frame.
             try
             {
                 if (!chara.IsCasting)
@@ -285,11 +279,8 @@ public sealed class PlayerScanner
         }
     }
 
-    /// <summary>
-    /// The in-loop filter can only see the raise status, because who is mid-cast is
-    /// not known until after the list exists. This drops anyone the first pass kept
-    /// who turns out to have a raise already on the way.
-    /// </summary>
+    // The in-loop filter only sees the raise status; who is mid-cast is not known until
+    // the list exists. This drops anyone kept by the first pass who has one incoming.
     private void ApplyRaiseFilters(List<PlayerEntry> list)
     {
         if (!this.config.FilterIgnoreAlreadyRaised)
@@ -305,9 +296,8 @@ public sealed class PlayerScanner
         Comparison<PlayerEntry> baseSort = this.config.Sort switch
         {
             SortMode.Alphabetical => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
-            // Missing HP is compared as a fraction of max HP rather than as a raw
-            // number, so a tank sitting on a large pool does not outrank a squishier
-            // player who is proportionally closer to dying.
+            // Compared as a fraction of max HP, so a tank on a large pool does not outrank a
+            // squishier player who is proportionally closer to dying.
             SortMode.MissingHp => (a, b) => a.HpFraction.CompareTo(b.HpFraction),
             _ => (a, b) =>
             {
@@ -332,10 +322,8 @@ public sealed class PlayerScanner
                 if (this.config.SelfAboveParty && a.IsSelf != b.IsSelf)
                     return a.IsSelf ? -1 : 1;
 
-                // You count as a party member for this rule even when solo. The party
-                // list is empty outside a party, so keying purely off it would leave
-                // you sorted in with everyone else exactly when you are easiest to
-                // lose track of.
+                // You count as a party member here even when solo: the party list is empty outside
+                // a party, so keying purely off it would sort you in with everyone else.
                 var partyA = a.IsPartyMember || a.IsSelf;
                 var partyB = b.IsPartyMember || b.IsSelf;
                 if (partyA != partyB)
