@@ -23,6 +23,8 @@ interact with. For a full zone roster, use Wholist.
 - Your target, soft target, focus target and party members each get their own
   highlight color.
 - Clicking a box selects that player.
+- A small button strip pinned to the same corner the list grows away from: hide the
+  list, open settings, and a help icon that reminds you Shift moves the window.
 
 ## Installing
 
@@ -53,6 +55,8 @@ Open with `/npl config`, or from the plugin installer.
 - Show the player list
 - Hide the list: never, in combat, out of combat, weapon drawn, or weapon sheathed
 - Lock list position
+- Show window buttons, which modifier they need (Ctrl by default), and whether hiding
+  the list leaves the strip behind so it acts as a show and hide toggle
 - Scale, typed as a percentage with step buttons and a reset
 - Max players listed, 0 for unlimited
 - Center player list, for when the window ends up off screen
@@ -113,6 +117,12 @@ new ones are added.
 member who is also your target keeps both colors. Soft target draws outside hard
 target, since a soft target is what an action lands on.
 
+**The button strip** always responds to hover, so the help tooltip is discoverable,
+but clicking needs a modifier. It sits next to boxes you click constantly and hiding
+the list by accident mid-fight would be miserable. Shift is not offered as that
+modifier because it already moves the window. The strip does capture the mouse in its
+own small area even without the modifier held.
+
 **Party detection** uses the party list. Alliance members are not treated as party.
 
 ## Credits
@@ -143,5 +153,6 @@ alongside it.
 [0BSD](LICENSE). Do whatever you want with it. No attribution, no notice to carry
 around, no conditions at all. The license text is there to say the software comes with
 no warranty, and nothing else.
+
 
 
