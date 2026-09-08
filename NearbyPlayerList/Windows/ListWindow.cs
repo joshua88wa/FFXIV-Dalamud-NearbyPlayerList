@@ -104,6 +104,13 @@ public sealed class ListWindow : Window
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(2, 2));
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(2, 2));
 
+        // ImGui clamps windows to style.WindowMinSize, 32x32 by default. The collapsed
+        // strip is shorter than that, so ImGui was quietly enlarging the window while
+        // we positioned it using the size we asked for, putting the pinned edge about
+        // twelve pixels out. Auto-resizing windows skip this clamp, which is why the
+        // problem only appeared once we started sizing the window ourselves.
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowMinSize, new Vector2(1, 1));
+
         // Sized explicitly rather than with AlwaysAutoResize. Auto-resize fits the
         // window to the PREVIOUS frame's content, which is invisible when the top left
         // is pinned but makes the pinned corner jump by the height difference every
@@ -161,7 +168,7 @@ public sealed class ListWindow : Window
         return new Vector2(width, height) + chrome;
     }
 
-    public override void PostDraw() => ImGui.PopStyleVar(2);
+    public override void PostDraw() => ImGui.PopStyleVar(3);
 
     /// <summary>
     /// ImGui hit testing is rectangular, so "click through the gaps" is done by
@@ -641,6 +648,7 @@ public sealed class ListWindow : Window
         }
     }
 }
+
 
 
 
