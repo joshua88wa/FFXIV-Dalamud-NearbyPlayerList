@@ -53,7 +53,10 @@ public sealed class Plugin : IDalamudPlugin
 
     private void Draw()
     {
-        this.listWindow.IsOpen = this.config.ShowWindow;
+        // The window still exists while the list is hidden if the button strip is
+        // being kept, so the strip can act as a collapse and restore control.
+        this.listWindow.IsOpen = this.config.ShowWindow
+                                 || (this.config.ShowWindowButtons && this.config.KeepButtonsWhenHidden);
         this.windowSystem.Draw();
     }
 
@@ -82,4 +85,5 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 }
+
 

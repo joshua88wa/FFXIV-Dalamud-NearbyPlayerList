@@ -114,6 +114,18 @@ public sealed class ConfigWindow : Window
             }
 
             TextHint("Shift is not offered here because it already moves the list.");
+
+            var keep = this.config.KeepButtonsWhenHidden;
+            if (ImGui.Checkbox("Keep the buttons when the list is hidden", ref keep))
+            {
+                this.config.KeepButtonsWhenHidden = keep;
+                dirty = true;
+            }
+
+            TextHint(keep
+                ? "Hiding the list leaves the buttons behind, so the first one becomes a show and hide toggle. Useful for dropping the list in a dungeon and bringing it back for a FATE without typing a command."
+                : "Hiding the list hides the buttons with it, so /npl is the only way back.");
+
             ImGui.Unindent();
         }
 
@@ -483,6 +495,7 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
 
 
 

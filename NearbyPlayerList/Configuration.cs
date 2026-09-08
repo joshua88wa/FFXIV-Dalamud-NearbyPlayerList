@@ -25,6 +25,7 @@ public class Configuration : IPluginConfiguration
     public bool LockPosition = false;
     public bool ShowWindowButtons = true;
     public ButtonModifier ButtonsRequire = ButtonModifier.Ctrl;
+    public bool KeepButtonsWhenHidden = false;
     public float Scale = 1.0f;
     public int MaxPlayers = 0;                 // 0 = unlimited
     public HideCondition HideWhen = HideCondition.Never;
@@ -95,6 +96,7 @@ public class Configuration : IPluginConfiguration
         this.Save();
     }
 }
+
 
 
 

@@ -67,7 +67,8 @@ public sealed class ListWindow : Window
 
     public override void PreDraw()
     {
-        this.entries = this.scanner.Scan();
+        // No point scanning the object table while the list is collapsed.
+        this.entries = this.config.ShowWindow ? this.scanner.Scan() : new List<PlayerEntry>();
 
         this.Flags = ImGuiWindowFlags.NoTitleBar
                      | ImGuiWindowFlags.NoScrollbar
@@ -155,15 +156,21 @@ public sealed class ListWindow : Window
         // makes the entire window draggable instead.
         this.interactive = !ImGui.GetIO().KeyShift;
 
-        if (this.entries.Count == 0)
-        {
-            // Keep a tiny footprint so the window still exists and can be found again.
-            ImGui.Dummy(new Vector2(1, 1));
-            return;
-        }
-
         var scale = Math.Clamp(this.config.Scale, 0.25f, 4f);
         ImGui.SetWindowFontScale(scale);
+
+        // Collapsed: the strip alone stands in for the list, and its first button
+        // restores it. Also covers the case where the list is on but nobody is nearby.
+        if (!this.config.ShowWindow || this.entries.Count == 0)
+        {
+            if (this.config.ShowWindowButtons)
+                this.DrawButtonRow(0f, scale);
+            else
+                ImGui.Dummy(new Vector2(1, 1));
+
+            ImGui.SetWindowFontScale(1f);
+            return;
+        }
 
         // Height is derived from the font rather than fixed, so the HP bar is always
         // tall enough to hold its own label. With the old fixed 34px box the bar came
@@ -431,7 +438,7 @@ public sealed class ListWindow : Window
         }
     }
 
-    private enum Glyph { Close, Settings, Info }
+    private enum Glyph { Close, Show, Settings, Info }
 
     private bool ButtonsActive() => this.config.ButtonsRequire switch
     {
@@ -465,9 +472,22 @@ public sealed class ListWindow : Window
 
         var gate = modifier == null ? string.Empty : $" Hold {modifier} to use these buttons.";
 
-        if (this.DrawIconButton("npl_close", size, active, Glyph.Close, "Hide the list", "Type /npl to bring it back." + gate))
+        var hidden = !this.config.ShowWindow;
+        var restorable = this.config.KeepButtonsWhenHidden;
+
+        if (this.DrawIconButton(
+                "npl_close",
+                size,
+                active,
+                hidden ? Glyph.Show : Glyph.Close,
+                hidden ? "Show the list" : "Hide the list",
+                hidden
+                    ? "Brings the player list back." + gate
+                    : (restorable
+                        ? "Leaves these buttons behind so you can bring it back." + gate
+                        : "Type /npl to bring it back." + gate)))
         {
-            this.config.ShowWindow = false;
+            this.config.ShowWindow = !this.config.ShowWindow;
             this.config.Save();
         }
 
@@ -527,6 +547,11 @@ public sealed class ListWindow : Window
                 draw.AddLine(new Vector2(b.X, a.Y), new Vector2(a.X, b.Y), color, thickness);
                 break;
 
+            case Glyph.Show:
+                draw.AddLine(new Vector2(a.X, center.Y), new Vector2(b.X, center.Y), color, thickness);
+                draw.AddLine(new Vector2(center.X, a.Y), new Vector2(center.X, b.Y), color, thickness);
+                break;
+
             case Glyph.Settings:
                 for (var i = 0; i < 3; i++)
                 {
@@ -569,6 +594,8 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
 
 
 
