@@ -579,8 +579,14 @@ public sealed class ListWindow : Window
         if (hovered)
         {
             using var tooltip = ImRaiiTooltip();
-            ImGui.Text(title);
-            ImGui.TextDisabled(body);
+            // ImGui.TextDisabled does not wrap, so the body ran out into one very wide
+            // line and dragged the whole tooltip out with it.
+            ImGui.PushTextWrapPos(ImGui.GetFontSize() * 18f);
+            ImGui.TextUnformatted(title);
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+            ImGui.TextWrapped(body);
+            ImGui.PopStyleColor();
+            ImGui.PopTextWrapPos();
         }
 
         return clicked;
@@ -648,6 +654,8 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
 
 
 
