@@ -25,6 +25,8 @@ interact with. For a full zone roster, use Wholist.
 - Clicking a box selects that player.
 - A small button strip pinned to the same corner the list grows away from: hide the
   list, open settings, and a help icon that reminds you Shift moves the window.
+- Filter mode buttons in that same strip, for switching between show all, show the
+  hurt, and show only the dead without opening settings.
 
 ## Installing
 
@@ -57,6 +59,8 @@ Open with `/npl config`, or from the plugin installer.
 - Lock list position
 - Show window buttons, which modifier they need (Ctrl by default), and whether hiding
   the list leaves the strip behind so it acts as a show and hide toggle
+- Show filter mode buttons, which add A, ! and a skull to the strip for the three
+  filter modes, with the current one highlighted
 - Scale, typed as a percentage with step buttons and a reset
 - Max players listed, 0 for unlimited
 - Center player list, for when the window ends up off screen
@@ -117,7 +121,9 @@ new ones are added.
 member who is also your target keeps both colors. Soft target draws outside hard
 target, since a soft target is what an action lands on.
 
-**The button strip** always responds to hover, so the help tooltip is discoverable,
+**The button strip** groups the window buttons against the pinned corner and hangs the
+filter buttons off the inside edge, so the hide button does not move when the filter
+group appears or disappears. It always responds to hover, so the help tooltip is discoverable,
 but clicking needs a modifier. It sits next to boxes you click constantly and hiding
 the list by accident mid-fight would be miserable. Shift is not offered as that
 modifier because it already moves the window. The strip does capture the mouse in its
@@ -153,6 +159,7 @@ alongside it.
 [0BSD](LICENSE). Do whatever you want with it. No attribution, no notice to carry
 around, no conditions at all. The license text is there to say the software comes with
 no warranty, and nothing else.
+
 
 
 
