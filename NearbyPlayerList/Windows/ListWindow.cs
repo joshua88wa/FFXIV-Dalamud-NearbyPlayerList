@@ -73,7 +73,7 @@ public sealed class ListWindow : Window
         this.Flags = ImGuiWindowFlags.NoTitleBar
                      | ImGuiWindowFlags.NoScrollbar
                      | ImGuiWindowFlags.NoScrollWithMouse
-                     | ImGuiWindowFlags.AlwaysAutoResize
+                     | ImGuiWindowFlags.NoResize
                      | ImGuiWindowFlags.NoFocusOnAppearing
                      | ImGuiWindowFlags.NoNav
                      | ImGuiWindowFlags.NoBackground
@@ -103,6 +103,62 @@ public sealed class ListWindow : Window
 
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(2, 2));
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(2, 2));
+
+        // Sized explicitly rather than with AlwaysAutoResize. Auto-resize fits the
+        // window to the PREVIOUS frame's content, which is invisible when the top left
+        // is pinned but makes the pinned corner jump by the height difference every
+        // time the player count changes when the bottom or right edge is pinned.
+        ImGui.SetNextWindowSize(this.CalcWindowSize(), ImGuiCond.Always);
+    }
+
+    private static Vector2 CalcBoxSize(float scale, float lineHeight)
+        => new(190f * scale, (3f * scale * 2f) + (lineHeight * 2f) + (2f * scale));
+
+    private (int Cols, int Rows) CalcGrid(int count)
+    {
+        var line = Math.Max(1, this.config.LineLength);
+
+        return this.config.Orientation == ListOrientation.Vertical
+            ? ((count + line - 1) / line, Math.Min(count, line))
+            : (Math.Min(count, line), (count + line - 1) / line);
+    }
+
+    private Vector2 CalcWindowSize()
+    {
+        var scale = Math.Clamp(this.config.Scale, 0.25f, 4f);
+
+        // PreDraw runs outside the window, so the window font scale is not applied yet.
+        // Multiplying by it here gives the same line height Draw will see.
+        var lineHeight = ImGui.GetTextLineHeight() * scale;
+
+        var pad = ImGui.GetStyle().WindowPadding;
+        var spacing = ImGui.GetStyle().ItemSpacing;
+        var chrome = pad * 2f;
+
+        var stripHeight = 16f * scale;
+        var stripWidth = (16f * scale * 3f) + (spacing.X * 2f);
+        var showStrip = this.config.ShowWindowButtons;
+
+        if (!this.config.ShowWindow || this.entries.Count == 0)
+        {
+            return showStrip
+                ? new Vector2(stripWidth, stripHeight) + chrome
+                : new Vector2(1f, 1f) + chrome;
+        }
+
+        var box = CalcBoxSize(scale, lineHeight);
+        var (cols, rows) = this.CalcGrid(this.entries.Count);
+
+        var width = (cols * box.X) + ((cols - 1) * spacing.X);
+        var height = (rows * box.Y) + ((rows - 1) * spacing.Y);
+
+        if (showStrip)
+        {
+            width = Math.Max(width, stripWidth);
+            height += stripHeight + spacing.Y;
+        }
+
+        return new Vector2(width, height) + chrome;
     }
 
     public override void PostDraw() => ImGui.PopStyleVar(2);
@@ -176,21 +232,12 @@ public sealed class ListWindow : Window
         // tall enough to hold its own label. With the old fixed 34px box the bar came
         // out around 10px tall and the label was silently dropped, which made the
         // "show HP numbers" setting look like it did nothing.
-        var boxSize = new Vector2(190f * scale, (3f * scale * 2f) + (ImGui.GetTextLineHeight() * 2f) + (2f * scale));
+        // Same helpers the window size calculation uses, so layout and size cannot
+        // drift apart and clip the last row.
+        var boxSize = CalcBoxSize(scale, ImGui.GetTextLineHeight());
         var line = Math.Max(1, this.config.LineLength);
         var count = this.entries.Count;
-
-        int cols, rows;
-        if (this.config.Orientation == ListOrientation.Vertical)
-        {
-            cols = (count + line - 1) / line;
-            rows = Math.Min(count, line);
-        }
-        else
-        {
-            rows = (count + line - 1) / line;
-            cols = Math.Min(count, line);
-        }
+        var (cols, rows) = this.CalcGrid(count);
 
         // Entries are placed into a grid rather than drawn straight down the list, so
         // that the growth direction can flip which end of the grid gets filled first.
@@ -594,6 +641,8 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
 
 
 
