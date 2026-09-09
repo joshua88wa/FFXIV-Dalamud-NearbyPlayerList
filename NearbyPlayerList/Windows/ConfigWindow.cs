@@ -204,12 +204,12 @@ public sealed class ConfigWindow : Window
         ImGui.TextDisabled("(hold Ctrl)");
 
         ImGui.Separator();
-        TextHint("Shift + drag  moves the list, from anywhere on it including a player box");
+        TextHint("Shift + drag moves the list, from anywhere on it including a player box");
         TextHint("While Shift is held the boxes ignore clicks, so you cannot target by accident");
 
-        TextHint("/npl  toggles the list");
-        TextHint("/npl config  opens this window");
-        TextHint("/npl center  brings the list back on screen");
+        TextHint("/npl toggles the list");
+        TextHint("/npl config opens this window");
+        TextHint("/npl center brings the list back on screen");
 
         return dirty;
     }
@@ -712,6 +712,7 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
 
 
 

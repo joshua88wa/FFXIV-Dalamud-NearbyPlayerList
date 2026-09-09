@@ -11,7 +11,7 @@ of each other in those places and clicking the right one is miserable.
 This is not a list of everyone in the zone. It only lists players you can select and
 interact with. For a full zone roster, use Wholist.
 
-![The list in the Occult Crescent](images/screenshot.jpg)
+<img src="images/screenshot.jpg" alt="The list in the Occult Crescent" width="294">
 
 ## Features
 
@@ -166,6 +166,7 @@ alongside it.
 [0BSD](LICENSE). Do whatever you want with it. No attribution, no notice to carry
 around, no conditions at all. The license text is there to say the software comes with
 no warranty, and nothing else.
+
 
 
 
