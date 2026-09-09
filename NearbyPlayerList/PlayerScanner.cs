@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -337,6 +337,19 @@ public sealed class PlayerScanner
         list.RemoveAll(e => e.IsDead && e.RaisedBy != null);
     }
 
+    private int TieBreakCompare(PlayerEntry a, PlayerEntry b)
+    {
+        if (this.config.MissingHpTieBreak == TieBreak.Role)
+        {
+            var ra = RoleOrder(a.Role);
+            var rb = RoleOrder(b.Role);
+            if (ra != rb)
+                return ra.CompareTo(rb);
+        }
+
+        return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void Sort(List<PlayerEntry> list)
     {
         Comparison<PlayerEntry> baseSort = this.config.Sort switch
@@ -344,7 +357,13 @@ public sealed class PlayerScanner
             SortMode.Alphabetical => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
             // Compared as a fraction of max HP, so a tank on a large pool does not outrank a
             // squishier player who is proportionally closer to dying.
-            SortMode.MissingHp => (a, b) => a.HpFraction.CompareTo(b.HpFraction),
+            SortMode.MissingHp => (a, b) =>
+            {
+                // Equal percentages are common, and List.Sort is not stable, so without a
+                // tie-break equal entries come out in an arbitrary order that reshuffles.
+                var byHp = a.HpFraction.CompareTo(b.HpFraction);
+                return byHp != 0 ? byHp : this.TieBreakCompare(a, b);
+            },
             _ => (a, b) =>
             {
                 var ra = RoleOrder(a.Role);
@@ -376,7 +395,11 @@ public sealed class PlayerScanner
                     return partyA ? -1 : 1;
             }
 
-            return baseSort(a, b);
+            var result = baseSort(a, b);
+
+            // Entity id last, so an otherwise exact tie still has one fixed order and
+            // the list cannot jitter between frames.
+            return result != 0 ? result : a.EntityId.CompareTo(b.EntityId);
         });
     }
 

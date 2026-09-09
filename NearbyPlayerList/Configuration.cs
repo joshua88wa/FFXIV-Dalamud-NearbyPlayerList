@@ -11,6 +11,7 @@ public enum ListOrientation { Vertical, Horizontal }
 public enum HorizontalGrowth { Right, Left }
 public enum VerticalGrowth { Down, Up }
 public enum SortMode { Role, Alphabetical, MissingHp }
+public enum TieBreak { Role, Alphabetical }
 public enum FilterMode { All, BelowHealthThreshold, DeadOnly }
 public enum HideCondition { Never, InCombat, OutOfCombat, WeaponDrawn, WeaponSheathed }
 public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget }
@@ -66,6 +67,7 @@ public class Configuration : IPluginConfiguration
 
     // Sorting
     public SortMode Sort = SortMode.Role;
+    public TieBreak MissingHpTieBreak = TieBreak.Role;
     public bool PartyAtTop = false;
     public bool SelfAboveParty = false;
     public bool DeadAtTop = false;
@@ -111,6 +113,7 @@ public class Configuration : IPluginConfiguration
         this.Save();
     }
 }
+
 
 
 

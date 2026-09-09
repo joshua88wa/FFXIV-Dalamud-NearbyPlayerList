@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
@@ -548,6 +548,21 @@ public sealed class ConfigWindow : Window
             dirty = true;
         if (ImGui.RadioButton("By missing HP (percentage)", ref sort, (int)SortMode.MissingHp))
             dirty = true;
+
+        if ((SortMode)sort == SortMode.MissingHp)
+        {
+            ImGui.Indent();
+            ImGui.SetNextItemWidth(220);
+            var tie = (int)this.config.MissingHpTieBreak;
+            if (ImGui.Combo("Then by", ref tie, "Role\0Alphabetically\0"))
+            {
+                this.config.MissingHpTieBreak = (TieBreak)tie;
+                dirty = true;
+            }
+
+            HelpMarker("Players at the same health percentage are common, especially when everyone is at full. Without a tie-break their order is arbitrary and can reshuffle on its own.");
+            ImGui.Unindent();
+        }
 
         if (sort != (int)this.config.Sort)
         {
