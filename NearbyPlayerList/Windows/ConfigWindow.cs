@@ -194,7 +194,9 @@ public sealed class ConfigWindow : Window
         ImGui.TextDisabled("(hold Ctrl)");
 
         ImGui.Separator();
-        TextHint("/npl toggles the list. /npl config opens this window. /npl center brings the list back on screen.");
+        TextHint("/npl  toggles the list");
+        TextHint("/npl config  opens this window");
+        TextHint("/npl center  brings the list back on screen");
 
         return dirty;
     }
@@ -510,6 +512,7 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
 
 
 

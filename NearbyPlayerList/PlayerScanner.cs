@@ -108,46 +108,53 @@ public sealed class PlayerScanner
 
             try
             {
-            if (!pc.IsTargetable)
-                continue;
+                if (!pc.IsTargetable)
+                    continue;
 
-            var isSelf = pc.EntityId == local.EntityId;
-            if (isSelf && this.config.HideSelf)
-                continue;
+                // Housing mannequins sit in the object table as targetable player objects
+                // with no name and no max HP, so they read as a nameless dead player. The
+                // same guard covers characters that have not finished loading.
+                var name = pc.Name.TextValue;
+                if (pc.MaxHp == 0 || string.IsNullOrWhiteSpace(name))
+                    continue;
 
-            var isParty = partyIds.Contains(pc.EntityId);
-            if (isParty && this.config.HideParty && !isSelf)
-                continue;
+                var isSelf = pc.EntityId == local.EntityId;
+                if (isSelf && this.config.HideSelf)
+                    continue;
 
-            var distance = Vector3.Distance(local.Position, pc.Position);
-            if (this.config.LimitDistance && distance > this.config.MaxDistance)
-                continue;
+                var isParty = partyIds.Contains(pc.EntityId);
+                if (isParty && this.config.HideParty && !isSelf)
+                    continue;
 
-            var entry = new PlayerEntry
-            {
-                EntityId = pc.EntityId,
-                Name = pc.Name.TextValue,
-                JobId = pc.ClassJob.RowId,
-                Role = SafeRole(pc),
-                CurrentHp = pc.CurrentHp,
-                MaxHp = pc.MaxHp,
-                IsDead = pc.CurrentHp == 0,
-                IsSelf = isSelf,
-                IsPartyMember = isParty,
-                Distance = distance,
-                GameObject = pc,
-                IsTarget = targetId != 0 && pc.EntityId == targetId,
-                IsSoftTarget = softTargetId != 0 && pc.EntityId == softTargetId,
-                IsFocusTarget = focusTargetId != 0 && pc.EntityId == focusTargetId,
-            };
+                var distance = Vector3.Distance(local.Position, pc.Position);
+                if (this.config.LimitDistance && distance > this.config.MaxDistance)
+                    continue;
 
-            if (entry.IsDead)
-                entry.AlreadyRaised = HasRaiseStatus(pc);
+                var entry = new PlayerEntry
+                {
+                    EntityId = pc.EntityId,
+                    Name = name,
+                    JobId = pc.ClassJob.RowId,
+                    Role = SafeRole(pc),
+                    CurrentHp = pc.CurrentHp,
+                    MaxHp = pc.MaxHp,
+                    IsDead = pc.CurrentHp == 0,
+                    IsSelf = isSelf,
+                    IsPartyMember = isParty,
+                    Distance = distance,
+                    GameObject = pc,
+                    IsTarget = targetId != 0 && pc.EntityId == targetId,
+                    IsSoftTarget = softTargetId != 0 && pc.EntityId == softTargetId,
+                    IsFocusTarget = focusTargetId != 0 && pc.EntityId == focusTargetId,
+                };
 
-            if (!this.PassesFilter(entry))
-                continue;
+                if (entry.IsDead)
+                    entry.AlreadyRaised = HasRaiseStatus(pc);
 
-            result.Add(entry);
+                if (!this.PassesFilter(entry))
+                    continue;
+
+                result.Add(entry);
             }
             catch (Exception ex)
             {
@@ -344,6 +351,7 @@ public sealed class PlayerScanner
         _ => 4,
     };
 }
+
 
 
 
