@@ -57,6 +57,16 @@ public sealed class PlayerScanner
 
     public IReadOnlyCollection<uint> RaiseActions => this.raiseActions;
 
+    // A narrower set for asking "can I raise right now". Actions the sheet assigns to
+    // job 0 belong to no job, so GetActionStatus has no requirement to fail and always
+    // reports them usable. That bucket holds Phoenix Down, Resistance Phoenix and a few
+    // unnamed rows, and it made the check true on gatherers and crafters. Duty and
+    // phantom raises are unaffected: they carry no job reference at all rather than
+    // job 0, and correctly report as unavailable until granted.
+    private readonly HashSet<uint> availabilityActions = new();
+
+    public IReadOnlyCollection<uint> RaiseActionsForAvailability => this.availabilityActions;
+
     private FilterMode effectiveFilter = FilterMode.All;
     private readonly Configuration config;
 
@@ -89,6 +99,30 @@ public sealed class PlayerScanner
         catch (Exception ex)
         {
             Service.Log.Warning(ex, "Could not extend the raise action list from the Action sheet; using the built-in list only.");
+        }
+
+        this.BuildAvailabilitySet();
+    }
+
+    private void BuildAvailabilitySet()
+    {
+        try
+        {
+            var sheet = Service.Data.GetExcelSheet<LuminaAction>();
+            foreach (var id in this.raiseActions)
+            {
+                var row = sheet?.GetRowOrDefault(id);
+                if (row == null || row.Value.ClassJob.RowId == 0)
+                    continue;
+
+                this.availabilityActions.Add(id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Service.Log.Warning(ex, "Could not build the raise availability set; falling back to the full list.");
+            foreach (var id in this.raiseActions)
+                this.availabilityActions.Add(id);
         }
     }
 
@@ -356,6 +390,7 @@ public sealed class PlayerScanner
         _ => 4,
     };
 }
+
 
 
 

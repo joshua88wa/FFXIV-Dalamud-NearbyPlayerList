@@ -55,7 +55,7 @@ public sealed class ListWindow : Window
         if (local == null)
             return false;
 
-        if (!VisibilityResolver.ShouldShow(this.config, this.scanner.RaiseActions))
+        if (!VisibilityResolver.ShouldShow(this.config, this.scanner.RaiseActionsForAvailability))
             return false;
 
         var inCombat = Service.Condition[ConditionFlag.InCombat];
@@ -770,6 +770,7 @@ public sealed class ListWindow : Window
         }
     }
 }
+
 
 
 

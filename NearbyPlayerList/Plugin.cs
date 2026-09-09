@@ -79,7 +79,7 @@ public sealed class Plugin : IDalamudPlugin
                 this.OpenConfig();
                 break;
             case "raisedebug":
-                VisibilityResolver.DumpRaiseStatus(this.scanner.RaiseActions);
+                VisibilityResolver.DumpRaiseStatus(this.scanner.RaiseActionsForAvailability);
                 break;
             case "center":
                 this.listWindow.RequestCenter();
@@ -90,6 +90,7 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 }
+
 
 
 
