@@ -85,6 +85,56 @@ public static unsafe class VisibilityResolver
         return cachedRaiseAvailable;
     }
 
+    // Diagnostic for /npl raisedebug. Prints what the game says about every action the
+    // plugin treats as a raise, so a false positive can be identified rather than
+    // guessed at.
+    public static void DumpRaiseStatus(IReadOnlyCollection<uint> raiseActions)
+    {
+        var local = Service.Objects.LocalPlayer;
+        Service.Log.Information($"[raisedebug] job={local?.ClassJob.RowId}, actions={raiseActions.Count}");
+
+        ActionManager* manager;
+        try
+        {
+            manager = ActionManager.Instance();
+        }
+        catch (Exception ex)
+        {
+            Service.Log.Error(ex, "[raisedebug] no ActionManager");
+            return;
+        }
+
+        if (manager == null)
+        {
+            Service.Log.Information("[raisedebug] ActionManager was null");
+            return;
+        }
+
+        var sheet = Service.Data.GetExcelSheet<Lumina.Excel.Sheets.Action>();
+
+        foreach (var id in raiseActions)
+        {
+            uint status;
+            try
+            {
+                status = manager->GetActionStatus(ActionType.Action, id);
+            }
+            catch (Exception ex)
+            {
+                Service.Log.Information($"[raisedebug] {id}: threw {ex.GetType().Name}");
+                continue;
+            }
+
+            var row = sheet?.GetRowOrDefault(id);
+            var name = row?.Name.ExtractText() ?? "?";
+            var isPlayer = row?.IsPlayerAction;
+            var job = row?.ClassJob.RowId;
+
+            Service.Log.Information(
+                $"[raisedebug] {id,6} status={status,5} player={isPlayer} job={job,3}  {name}");
+        }
+    }
+
     public static FilterMode EffectiveFilter(Configuration config)
     {
         if (!config.UseZoneRules)
@@ -102,3 +152,4 @@ public static unsafe class VisibilityResolver
         };
     }
 }
+

@@ -14,6 +14,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Configuration config;
     private readonly ListWindow listWindow;
     private readonly ConfigWindow configWindow;
+    private readonly PlayerScanner scanner;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
@@ -22,7 +23,8 @@ public sealed class Plugin : IDalamudPlugin
         this.config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         this.config.Initialize(pluginInterface);
 
-        var scanner = new PlayerScanner(this.config);
+        this.scanner = new PlayerScanner(this.config);
+        var scanner = this.scanner;
         this.listWindow = new ListWindow(this.config, scanner) { IsOpen = this.config.ShowWindow };
         this.configWindow = new ConfigWindow(this.config, this.listWindow);
         this.listWindow.OpenConfig = this.OpenConfig;
@@ -76,6 +78,9 @@ public sealed class Plugin : IDalamudPlugin
             case "settings":
                 this.OpenConfig();
                 break;
+            case "raisedebug":
+                VisibilityResolver.DumpRaiseStatus(this.scanner.RaiseActions);
+                break;
             case "center":
                 this.listWindow.RequestCenter();
                 break;
@@ -85,5 +90,6 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 }
+
 
 
