@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Reflection;
 using Dalamud.Configuration;
@@ -30,6 +31,16 @@ public class Configuration : IPluginConfiguration
     public float Scale = 1.0f;
     public int MaxPlayers = 0;                 // 0 = unlimited
     public HideCondition HideWhen = HideCondition.Never;
+
+    // Visibility rules
+    public bool UseZoneRules = false;
+    public Dictionary<ZoneCategory, ZoneRule> ZoneRules = new();
+
+    public bool UseJobRule = false;
+    public bool JobRuleAnyRaise = true;
+
+    // Seeded with the jobs that have a raise. WHM, SMN, SCH, AST, RDM, BLU, SGE.
+    public HashSet<uint> VisibleJobs = new() { 24, 27, 28, 33, 35, 36, 40 };
 
     // Layout
     public ListOrientation Orientation = ListOrientation.Vertical;
@@ -93,6 +104,7 @@ public class Configuration : IPluginConfiguration
         this.Save();
     }
 }
+
 
 
 

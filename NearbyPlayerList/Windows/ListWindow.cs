@@ -49,6 +49,9 @@ public sealed class ListWindow : Window
         if (local == null)
             return false;
 
+        if (!VisibilityResolver.ShouldShow(this.config, this.scanner.RaiseActions))
+            return false;
+
         var inCombat = Service.Condition[ConditionFlag.InCombat];
         var weaponOut = local.StatusFlags.HasFlag(StatusFlags.WeaponOut);
 
@@ -567,19 +570,22 @@ public sealed class ListWindow : Window
         var gate = this.ModifierHint();
         var threshold = (int)Math.Round(this.config.HealthThreshold * 100f);
 
+        // Highlights the mode actually in force, which a zone rule may be overriding.
+        var current = VisibilityResolver.EffectiveFilter(this.config);
+
         if (this.DrawIconButton("npl_f_all", size, active, Glyph.FilterAll, "Show all players",
-                "No filtering." + gate, this.config.Filter == FilterMode.All))
+                "No filtering." + gate, current == FilterMode.All))
             this.SetFilter(FilterMode.All);
 
         ImGui.SameLine();
         if (this.DrawIconButton("npl_f_hurt", size, active, Glyph.FilterHurt, "Show the hurt",
                 $"Only players at or below {threshold}% health. Dead players are below any threshold, so they show here too." + gate,
-                this.config.Filter == FilterMode.BelowHealthThreshold))
+                current == FilterMode.BelowHealthThreshold))
             this.SetFilter(FilterMode.BelowHealthThreshold);
 
         ImGui.SameLine();
         if (this.DrawIconButton("npl_f_dead", size, active, Glyph.FilterDead, "Show only the dead",
-                "The raising mode." + gate, this.config.Filter == FilterMode.DeadOnly))
+                "The raising mode." + gate, current == FilterMode.DeadOnly))
             this.SetFilter(FilterMode.DeadOnly);
     }
 
@@ -718,6 +724,7 @@ public sealed class ListWindow : Window
         }
     }
 }
+
 
 
 

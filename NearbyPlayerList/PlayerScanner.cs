@@ -54,6 +54,10 @@ public sealed class PlayerScanner
     };
 
     private readonly HashSet<uint> raiseActions = new(KnownRaiseActions);
+
+    public IReadOnlyCollection<uint> RaiseActions => this.raiseActions;
+
+    private FilterMode effectiveFilter = FilterMode.All;
     private readonly Configuration config;
 
     public PlayerScanner(Configuration config)
@@ -96,6 +100,7 @@ public sealed class PlayerScanner
         if (local == null)
             return result;
 
+        this.effectiveFilter = VisibilityResolver.EffectiveFilter(this.config);
         var partyIds = this.CollectPartyIds();
         var targetId = Service.Targets.Target?.EntityId ?? 0;
         var softTargetId = Service.Targets.SoftTarget?.EntityId ?? 0;
@@ -262,7 +267,7 @@ public sealed class PlayerScanner
 
     private bool PassesFilter(PlayerEntry entry)
     {
-        switch (this.config.Filter)
+        switch (this.effectiveFilter)
         {
             case FilterMode.BelowHealthThreshold:
                 if (entry.MaxHp == 0)
@@ -292,7 +297,7 @@ public sealed class PlayerScanner
     {
         if (!this.config.FilterIgnoreAlreadyRaised)
             return;
-        if (this.config.Filter == FilterMode.All)
+        if (this.effectiveFilter == FilterMode.All)
             return;
 
         list.RemoveAll(e => e.IsDead && e.RaisedBy != null);
@@ -351,6 +356,7 @@ public sealed class PlayerScanner
         _ => 4,
     };
 }
+
 
 
 
