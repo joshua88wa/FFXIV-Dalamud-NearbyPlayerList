@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -54,6 +54,20 @@ public sealed class PlayerScanner
     };
 
     private readonly HashSet<uint> raiseActions = new(KnownRaiseActions);
+
+    public IReadOnlyCollection<uint> RaiseActions => this.raiseActions;
+
+    // A narrower set for asking "can I raise right now". Actions the sheet assigns to
+    // job 0 belong to no job, so GetActionStatus has no requirement to fail and always
+    // reports them usable. That bucket holds Phoenix Down, Resistance Phoenix and a few
+    // unnamed rows, and it made the check true on gatherers and crafters. Duty and
+    // phantom raises are unaffected: they carry no job reference at all rather than
+    // job 0, and correctly report as unavailable until granted.
+    private readonly HashSet<uint> availabilityActions = new();
+
+    public IReadOnlyCollection<uint> RaiseActionsForAvailability => this.availabilityActions;
+
+    private FilterMode effectiveFilter = FilterMode.All;
     private readonly Configuration config;
 
     public PlayerScanner(Configuration config)
@@ -86,6 +100,30 @@ public sealed class PlayerScanner
         {
             Service.Log.Warning(ex, "Could not extend the raise action list from the Action sheet; using the built-in list only.");
         }
+
+        this.BuildAvailabilitySet();
+    }
+
+    private void BuildAvailabilitySet()
+    {
+        try
+        {
+            var sheet = Service.Data.GetExcelSheet<LuminaAction>();
+            foreach (var id in this.raiseActions)
+            {
+                var row = sheet?.GetRowOrDefault(id);
+                if (row == null || row.Value.ClassJob.RowId == 0)
+                    continue;
+
+                this.availabilityActions.Add(id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Service.Log.Warning(ex, "Could not build the raise availability set; falling back to the full list.");
+            foreach (var id in this.raiseActions)
+                this.availabilityActions.Add(id);
+        }
     }
 
     public List<PlayerEntry> Scan()
@@ -96,6 +134,7 @@ public sealed class PlayerScanner
         if (local == null)
             return result;
 
+        this.effectiveFilter = VisibilityResolver.EffectiveFilter(this.config);
         var partyIds = this.CollectPartyIds();
         var targetId = Service.Targets.Target?.EntityId ?? 0;
         var softTargetId = Service.Targets.SoftTarget?.EntityId ?? 0;
@@ -262,7 +301,7 @@ public sealed class PlayerScanner
 
     private bool PassesFilter(PlayerEntry entry)
     {
-        switch (this.config.Filter)
+        switch (this.effectiveFilter)
         {
             case FilterMode.BelowHealthThreshold:
                 if (entry.MaxHp == 0)
@@ -292,10 +331,23 @@ public sealed class PlayerScanner
     {
         if (!this.config.FilterIgnoreAlreadyRaised)
             return;
-        if (this.config.Filter == FilterMode.All)
+        if (this.effectiveFilter == FilterMode.All)
             return;
 
         list.RemoveAll(e => e.IsDead && e.RaisedBy != null);
+    }
+
+    private int TieBreakCompare(PlayerEntry a, PlayerEntry b)
+    {
+        if (this.config.MissingHpTieBreak == TieBreak.Role)
+        {
+            var ra = RoleOrder(a.Role);
+            var rb = RoleOrder(b.Role);
+            if (ra != rb)
+                return ra.CompareTo(rb);
+        }
+
+        return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Sort(List<PlayerEntry> list)
@@ -305,7 +357,13 @@ public sealed class PlayerScanner
             SortMode.Alphabetical => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
             // Compared as a fraction of max HP, so a tank on a large pool does not outrank a
             // squishier player who is proportionally closer to dying.
-            SortMode.MissingHp => (a, b) => a.HpFraction.CompareTo(b.HpFraction),
+            SortMode.MissingHp => (a, b) =>
+            {
+                // Equal percentages are common, and List.Sort is not stable, so without a
+                // tie-break equal entries come out in an arbitrary order that reshuffles.
+                var byHp = a.HpFraction.CompareTo(b.HpFraction);
+                return byHp != 0 ? byHp : this.TieBreakCompare(a, b);
+            },
             _ => (a, b) =>
             {
                 var ra = RoleOrder(a.Role);
@@ -337,7 +395,11 @@ public sealed class PlayerScanner
                     return partyA ? -1 : 1;
             }
 
-            return baseSort(a, b);
+            var result = baseSort(a, b);
+
+            // Entity id last, so an otherwise exact tie still has one fixed order and
+            // the list cannot jitter between frames.
+            return result != 0 ? result : a.EntityId.CompareTo(b.EntityId);
         });
     }
 
@@ -351,6 +413,8 @@ public sealed class PlayerScanner
         _ => 4,
     };
 }
+
+
 
 
 

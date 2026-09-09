@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Reflection;
 using Dalamud.Configuration;
@@ -10,6 +11,7 @@ public enum ListOrientation { Vertical, Horizontal }
 public enum HorizontalGrowth { Right, Left }
 public enum VerticalGrowth { Down, Up }
 public enum SortMode { Role, Alphabetical, MissingHp }
+public enum TieBreak { Role, Alphabetical }
 public enum FilterMode { All, BelowHealthThreshold, DeadOnly }
 public enum HideCondition { Never, InCombat, OutOfCombat, WeaponDrawn, WeaponSheathed }
 public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget }
@@ -23,6 +25,13 @@ public class Configuration : IPluginConfiguration
     // Window
     public bool ShowWindow = true;
     public bool LockPosition = false;
+
+    // The pinned corner, in screen coordinates. Stored here rather than left to ImGui's
+    // ini, which saves the top left. Deriving the pinned corner from a restored top left
+    // plus whatever size the window happens to be on the first frame after login puts it
+    // out by the difference between the empty and populated sizes.
+    public float AnchorX = float.NaN;
+    public float AnchorY = float.NaN;
     public bool ShowWindowButtons = true;
     public ButtonModifier ButtonsRequire = ButtonModifier.Ctrl;
     public bool KeepButtonsWhenHidden = true;
@@ -30,6 +39,16 @@ public class Configuration : IPluginConfiguration
     public float Scale = 1.0f;
     public int MaxPlayers = 0;                 // 0 = unlimited
     public HideCondition HideWhen = HideCondition.Never;
+
+    // Visibility rules
+    public bool UseZoneRules = false;
+    public Dictionary<ZoneCategory, ZoneRule> ZoneRules = new();
+
+    public bool UseJobRule = false;
+    public bool JobRuleAnyRaise = true;
+
+    // Seeded with the jobs that have a raise. WHM, SMN, SCH, AST, RDM, BLU, SGE.
+    public HashSet<uint> VisibleJobs = new() { 24, 27, 28, 33, 35, 36, 40 };
 
     // Layout
     public ListOrientation Orientation = ListOrientation.Vertical;
@@ -48,6 +67,7 @@ public class Configuration : IPluginConfiguration
 
     // Sorting
     public SortMode Sort = SortMode.Role;
+    public TieBreak MissingHpTieBreak = TieBreak.Role;
     public bool PartyAtTop = false;
     public bool SelfAboveParty = false;
     public bool DeadAtTop = false;
@@ -93,6 +113,9 @@ public class Configuration : IPluginConfiguration
         this.Save();
     }
 }
+
+
+
 
 
 

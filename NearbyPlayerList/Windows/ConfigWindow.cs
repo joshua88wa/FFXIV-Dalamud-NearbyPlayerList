@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
@@ -7,6 +7,8 @@ namespace NearbyPlayerList.Windows;
 
 public sealed class ConfigWindow : Window
 {
+    private const string IssueUrl = "https://github.com/joshua88wa/FFXIV-Dalamud-NearbyPlayerList/issues";
+
     private readonly Configuration config;
     private readonly ListWindow list;
 
@@ -19,37 +21,62 @@ public sealed class ConfigWindow : Window
         this.SizeCondition = ImGuiCond.FirstUseEver;
     }
 
+    // Set by the strip so its settings button lands on the tab that explains whatever
+    // it was showing, instead of dropping you on Window to hunt for it.
+    private string? requestedTab;
+
+    public void RequestTab(string tab)
+    {
+        this.requestedTab = tab;
+        this.IsOpen = true;
+    }
+
+    private ImGuiTabItemFlags TabFlags(string tab)
+    {
+        if (this.requestedTab != tab)
+            return ImGuiTabItemFlags.None;
+
+        this.requestedTab = null;
+        return ImGuiTabItemFlags.SetSelected;
+    }
+
     public override void Draw()
     {
         var dirty = false;
 
         if (ImGui.BeginTabBar("##npl_tabs"))
         {
-            if (ImGui.BeginTabItem("Window"))
+            if (ImGui.BeginTabItem("Window", this.TabFlags("Window")))
             {
                 dirty |= this.DrawWindowTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Layout"))
+            if (ImGui.BeginTabItem("Visibility", this.TabFlags("Visibility")))
+            {
+                dirty |= this.DrawVisibilityTab();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Layout", this.TabFlags("Layout")))
             {
                 dirty |= this.DrawLayoutTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Filtering"))
+            if (ImGui.BeginTabItem("Filtering", this.TabFlags("Filtering")))
             {
                 dirty |= this.DrawFilterTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Sorting"))
+            if (ImGui.BeginTabItem("Sorting", this.TabFlags("Sorting")))
             {
                 dirty |= this.DrawSortTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Other"))
+            if (ImGui.BeginTabItem("Other", this.TabFlags("Other")))
             {
                 dirty |= this.DrawOtherTab();
                 ImGui.EndTabItem();
@@ -65,23 +92,6 @@ public sealed class ConfigWindow : Window
     private bool DrawWindowTab()
     {
         var dirty = false;
-
-        var show = this.config.ShowWindow;
-        if (ImGui.Checkbox("Show the player list", ref show))
-        {
-            this.config.ShowWindow = show;
-            dirty = true;
-        }
-
-        ImGui.SetNextItemWidth(220);
-        var hideWhen = (int)this.config.HideWhen;
-        if (ImGui.Combo("Hide the list", ref hideWhen, "Never\0In combat\0Out of combat\0Weapon drawn\0Weapon sheathed\0"))
-        {
-            this.config.HideWhen = (HideCondition)hideWhen;
-            dirty = true;
-        }
-
-        ImGui.Separator();
 
         var locked = this.config.LockPosition;
         if (ImGui.Checkbox("Lock list position", ref locked))
@@ -194,12 +204,186 @@ public sealed class ConfigWindow : Window
         ImGui.TextDisabled("(hold Ctrl)");
 
         ImGui.Separator();
-        TextHint("Shift + drag  moves the list, from anywhere on it including a player box");
+        TextHint("Shift + drag moves the list, from anywhere on it including a player box");
         TextHint("While Shift is held the boxes ignore clicks, so you cannot target by accident");
 
-        TextHint("/npl  toggles the list");
-        TextHint("/npl config  opens this window");
-        TextHint("/npl center  brings the list back on screen");
+        TextHint("/npl toggles the list");
+        TextHint("/npl config opens this window");
+        TextHint("/npl center brings the list back on screen");
+
+        return dirty;
+    }
+    private bool DrawVisibilityTab()
+    {
+        var dirty = false;
+
+        var show = this.config.ShowWindow;
+        if (ImGui.Checkbox("Show the player list", ref show))
+        {
+            this.config.ShowWindow = show;
+            dirty = true;
+        }
+
+        ImGui.SetNextItemWidth(220);
+        var hideWhen = (int)this.config.HideWhen;
+        if (ImGui.Combo("Hide the list", ref hideWhen, "Never\0In combat\0Out of combat\0Weapon drawn\0Weapon sheathed\0"))
+        {
+            this.config.HideWhen = (HideCondition)hideWhen;
+            dirty = true;
+        }
+
+        ImGui.Separator();
+        dirty |= this.DrawZoneRules();
+        ImGui.Separator();
+        dirty |= this.DrawJobRule();
+
+        ImGui.Separator();
+        TextHint("The list is always disabled in PvP, and that is not configurable.");
+
+        return dirty;
+    }
+
+    private bool DrawZoneRules()
+    {
+        var dirty = false;
+
+        var useZones = this.config.UseZoneRules;
+        if (ImGui.Checkbox("Change visibility by zone", ref useZones))
+        {
+            this.config.UseZoneRules = useZones;
+            dirty = true;
+        }
+
+        HelpMarker("Zones are classified from the game's own intended-use field. Anything not recognised falls into Everything else rather than being guessed at, so new content behaves predictably until the mapping is updated.");
+
+        if (!useZones)
+            return dirty;
+
+        ImGui.Indent();
+        TextHint($"Currently in: {ZoneClassifier.Label(ZoneClassifier.Current())}");
+        ImGui.Spacing();
+
+        if (ImGui.BeginTable("##npl_zones", 3, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("Zone", ImGuiTableColumnFlags.WidthFixed, 150f);
+            ImGui.TableSetupColumn("List", ImGuiTableColumnFlags.WidthFixed, 110f);
+            ImGui.TableSetupColumn("Filter mode", ImGuiTableColumnFlags.WidthFixed, 150f);
+            ImGui.TableHeadersRow();
+
+            foreach (var category in ZoneClassifier.Configurable())
+            {
+                if (!this.config.ZoneRules.TryGetValue(category, out var rule))
+                {
+                    rule = new ZoneRule();
+                    this.config.ZoneRules[category] = rule;
+                }
+
+                ImGui.TableNextRow();
+
+                ImGui.TableNextColumn();
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextUnformatted(ZoneClassifier.Label(category));
+
+                ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(-1);
+                var vis = (int)rule.Visibility;
+                if (ImGui.Combo($"##vis_{category}", ref vis, "Default\0Show\0Hide\0"))
+                {
+                    rule.Visibility = (ZoneVisibility)vis;
+                    dirty = true;
+                }
+
+                ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(-1);
+                var filter = (int)rule.Filter;
+                if (ImGui.Combo($"##filt_{category}", ref filter, "No change\0Show all\0Show the hurt\0Show only dead\0"))
+                {
+                    rule.Filter = (ZoneFilterOverride)filter;
+                    dirty = true;
+                }
+            }
+
+            ImGui.EndTable();
+        }
+
+        TextHint("A zone set to Show overrides the job rule below. A filter override does not change your saved filter mode, so the filter buttons go back to it when you leave.");
+        ImGui.Unindent();
+
+        return dirty;
+    }
+
+    private bool DrawJobRule()
+    {
+        var dirty = false;
+
+        var useJobs = this.config.UseJobRule;
+        if (ImGui.Checkbox("Change visibility by job", ref useJobs))
+        {
+            this.config.UseJobRule = useJobs;
+            dirty = true;
+        }
+
+        HelpMarker("Hides the list entirely on jobs you have not ticked, so it does not sit on screen while you are playing something that cannot help.");
+
+        if (!useJobs)
+            return dirty;
+
+        ImGui.Indent();
+
+        var anyRaise = this.config.JobRuleAnyRaise;
+        if (ImGui.Checkbox("Or whenever I have a raise available", ref anyRaise))
+        {
+            this.config.JobRuleAnyRaise = anyRaise;
+            dirty = true;
+        }
+
+        HelpMarker("Covers phantom jobs in the Occult Crescent and anything else that grants a raise without changing your job. Those are not job rows in the game's data, so they cannot appear in the list below.");
+
+        ImGui.Spacing();
+        dirty |= this.DrawJobGrid();
+        ImGui.Unindent();
+
+        return dirty;
+    }
+
+    private bool DrawJobGrid()
+    {
+        var dirty = false;
+
+        var sheet = Service.Data.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>();
+        if (sheet == null)
+        {
+            TextHint("Job list unavailable.");
+            return dirty;
+        }
+
+        var column = 0;
+        foreach (var job in sheet)
+        {
+            // Rows below 19 are the base classes, which you cannot be in current
+            // content, and role 0 is everything that is not a combat job.
+            if (job.RowId < 19 || job.Role == 0)
+                continue;
+
+            var abbreviation = job.Abbreviation.ExtractText();
+            if (string.IsNullOrWhiteSpace(abbreviation))
+                continue;
+
+            if (column % 6 != 0)
+                ImGui.SameLine();
+            column++;
+
+            var ticked = this.config.VisibleJobs.Contains(job.RowId);
+            if (ImGui.Checkbox($"{abbreviation}##job{job.RowId}", ref ticked))
+            {
+                if (ticked)
+                    this.config.VisibleJobs.Add(job.RowId);
+                else
+                    this.config.VisibleJobs.Remove(job.RowId);
+
+                dirty = true;
+            }
+        }
 
         return dirty;
     }
@@ -365,6 +549,21 @@ public sealed class ConfigWindow : Window
         if (ImGui.RadioButton("By missing HP (percentage)", ref sort, (int)SortMode.MissingHp))
             dirty = true;
 
+        if ((SortMode)sort == SortMode.MissingHp)
+        {
+            ImGui.Indent();
+            ImGui.SetNextItemWidth(220);
+            var tie = (int)this.config.MissingHpTieBreak;
+            if (ImGui.Combo("Then by", ref tie, "Role\0Alphabetically\0"))
+            {
+                this.config.MissingHpTieBreak = (TieBreak)tie;
+                dirty = true;
+            }
+
+            HelpMarker("Players at the same health percentage are common, especially when everyone is at full. Without a tie-break their order is arbitrary and can reshuffle on its own.");
+            ImGui.Unindent();
+        }
+
         if (sort != (int)this.config.Sort)
         {
             this.config.Sort = (SortMode)sort;
@@ -471,6 +670,19 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
+        ImGui.Separator();
+
+        TextHint("Found a bug, or have an idea? Open an issue:");
+
+        if (ImGui.Button("Open the issue tracker"))
+            Dalamud.Utility.Util.OpenLink(IssueUrl);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy link"))
+            ImGui.SetClipboardText(IssueUrl);
+
+        TextHint(IssueUrl);
+
         return dirty;
     }
 
@@ -515,6 +727,12 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
+
+
+
+
+
 
 
 

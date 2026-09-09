@@ -1,4 +1,4 @@
-﻿# Nearby Player List
+# Nearby Player List
 
 A Dalamud plugin for FINAL FANTASY XIV. It shows a compact, clickable list of the
 player characters you can actually target, so you can heal or raise someone without
@@ -10,6 +10,8 @@ of each other in those places and clicking the right one is miserable.
 
 This is not a list of everyone in the zone. It only lists players you can select and
 interact with. For a full zone roster, use Wholist.
+
+<img src="images/screenshot.jpg" alt="The list in the Occult Crescent" width="294">
 
 ## Features
 
@@ -23,6 +25,8 @@ interact with. For a full zone roster, use Wholist.
 - Your target, soft target, focus target and party members each get their own
   highlight color.
 - Clicking a box selects that player.
+- Visibility rules, so the list can show or hide itself by zone type and by job.
+- Always disabled in PvP.
 - A small button strip pinned to the same corner the list grows away from: hide the
   list, open settings, and a help icon that reminds you Shift moves the window.
 - Filter mode buttons in that same strip, for switching between show all, show the
@@ -54,8 +58,6 @@ Open with `/npl config`, or from the plugin installer.
 
 ### Window
 
-- Show the player list
-- Hide the list: never, in combat, out of combat, weapon drawn, or weapon sheathed
 - Lock list position
 - Show window buttons, which modifier they need (Ctrl by default), and whether hiding
   the list leaves the strip behind so it acts as a show and hide toggle
@@ -65,6 +67,20 @@ Open with `/npl config`, or from the plugin installer.
 - Max players listed, 0 for unlimited
 - Center player list, for when the window ends up off screen
 - Reset all settings to defaults, held behind Ctrl
+- A reference block listing how to move the list and the slash commands
+
+### Visibility
+
+- Show the player list
+- Hide the list: never, in combat, out of combat, weapon drawn, or weapon sheathed
+- Change visibility by zone. Each of overworld, cities and inns, housing, dungeons,
+  trials, 8 player raids, 24 player alliance raids, Deep Dungeon, Field Operations and
+  everything else can be set to show, hide, or follow the default, with an optional
+  filter mode override. The tab shows which category you are currently in.
+- Change visibility by job, seeded with the seven jobs that have a raise, plus an
+  option to show the list whenever you actually have a raise available. That covers
+  phantom jobs in the Occult Crescent, which are not job rows in the game's data and
+  so cannot appear in a job list.
 
 ### Layout
 
@@ -90,6 +106,8 @@ Open with `/npl config`, or from the plugin installer.
 ### Sorting
 
 - By role, alphabetically, or by missing HP as a percentage of max HP
+- When sorting by missing HP, a tie-break of role or alphabetical, since players at
+  the same percentage are common and would otherwise be in an arbitrary order
 - Party members at top, with an option to put yourself above the rest of them. You
   count as party for this even when solo.
 - Dead players at top, optionally skipping anyone who already has a raise incoming
@@ -129,7 +147,25 @@ the list by accident mid-fight would be miserable. Shift is not offered as that
 modifier because it already moves the window. The strip does capture the mouse in its
 own small area even without the modifier held.
 
+**Zone classification** uses ContentFinderCondition.ContentType for instanced content,
+which is what separates dungeons from trials from raids, and the content member type to
+tell an 8 player raid from a 24 player alliance raid. Open zones have no content row, so
+those fall back to TerritoryIntendedUse. Anything unrecognised lands in Everything else
+rather than being guessed at.
+
+**PvP** is a hard block rather than a setting. The list is targetable players with live
+HP and one-click targeting, which in PvP is an enemy list with a target assist.
+
+**A zone filter override does not overwrite your saved filter mode.** Clicking a filter
+button while a zone rule is in force wins until you leave the zone, then the rule takes
+over again.
+
 **Party detection** uses the party list. Alliance members are not treated as party.
+
+## Problems and suggestions
+
+Open an issue:
+[github.com/joshua88wa/FFXIV-Dalamud-NearbyPlayerList/issues](https://github.com/joshua88wa/FFXIV-Dalamud-NearbyPlayerList/issues)
 
 ## Credits
 
@@ -159,6 +195,8 @@ alongside it.
 [0BSD](LICENSE). Do whatever you want with it. No attribution, no notice to carry
 around, no conditions at all. The license text is there to say the software comes with
 no warranty, and nothing else.
+
+
 
 
 
