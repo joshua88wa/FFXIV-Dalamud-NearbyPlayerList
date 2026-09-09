@@ -47,7 +47,7 @@ public sealed class ListWindow : Window
     }
 
     // Set by the plugin so the settings button can open the config window.
-    public Action? OpenConfig { get; set; }
+    public Action<string>? OpenConfig { get; set; }
 
     public void RequestCenter() => this.centerRequested = true;
 
@@ -538,8 +538,7 @@ public sealed class ListWindow : Window
     {
         var size = this.StripHeight(scale);
         var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var buttons = this.visibility == ListVisibility.HiddenByRule ? 2f : 3f;
-        var width = (size * buttons) + (spacing * (buttons - 1f));
+        var width = (size * 3f) + (spacing * 2f);
 
         if (this.ShowFilterGroup())
             width += (size * 0.75f) + (size * 3f) + (spacing * 2f);
@@ -612,7 +611,11 @@ public sealed class ListWindow : Window
 
             ImGui.SameLine();
             if (this.DrawIconButton("npl_config", size, active, Glyph.Settings, "Settings", "Same as typing /npl config." + gate))
-                this.OpenConfig?.Invoke();
+                this.OpenConfig?.Invoke("Visibility");
+
+            ImGui.SameLine();
+            this.DrawIconButton("npl_info", size, active, Glyph.Info, "Moving the list",
+                "Hold Shift and drag from anywhere on the list. /npl center brings it back if it ends up off screen.");
 
             return;
         }
@@ -637,7 +640,7 @@ public sealed class ListWindow : Window
 
         ImGui.SameLine();
         if (this.DrawIconButton("npl_config", size, active, Glyph.Settings, "Settings", "Same as typing /npl config." + gate))
-            this.OpenConfig?.Invoke();
+            this.OpenConfig?.Invoke("Window");
 
         ImGui.SameLine();
         this.DrawIconButton("npl_info", size, active, Glyph.Info, "Moving the list",
@@ -673,6 +676,10 @@ public sealed class ListWindow : Window
     {
         this.config.Filter = mode;
         this.config.Save();
+
+        // Also beats a zone filter rule for as long as you stay in this zone, so the
+        // buttons are never dead while a rule is in force.
+        VisibilityResolver.SetManualFilter(mode);
     }
     private bool DrawIconButton(string id, float size, bool active, Glyph glyph, string title, string body, bool selected = false, Vector4? tint = null)
     {
@@ -814,6 +821,9 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
+
 
 
 

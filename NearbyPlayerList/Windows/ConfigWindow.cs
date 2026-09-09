@@ -7,6 +7,8 @@ namespace NearbyPlayerList.Windows;
 
 public sealed class ConfigWindow : Window
 {
+    private const string IssueUrl = "https://github.com/joshua88wa/FFXIV-Dalamud-NearbyPlayerList/issues";
+
     private readonly Configuration config;
     private readonly ListWindow list;
 
@@ -19,43 +21,62 @@ public sealed class ConfigWindow : Window
         this.SizeCondition = ImGuiCond.FirstUseEver;
     }
 
+    // Set by the strip so its settings button lands on the tab that explains whatever
+    // it was showing, instead of dropping you on Window to hunt for it.
+    private string? requestedTab;
+
+    public void RequestTab(string tab)
+    {
+        this.requestedTab = tab;
+        this.IsOpen = true;
+    }
+
+    private ImGuiTabItemFlags TabFlags(string tab)
+    {
+        if (this.requestedTab != tab)
+            return ImGuiTabItemFlags.None;
+
+        this.requestedTab = null;
+        return ImGuiTabItemFlags.SetSelected;
+    }
+
     public override void Draw()
     {
         var dirty = false;
 
         if (ImGui.BeginTabBar("##npl_tabs"))
         {
-            if (ImGui.BeginTabItem("Window"))
+            if (ImGui.BeginTabItem("Window", this.TabFlags("Window")))
             {
                 dirty |= this.DrawWindowTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Visibility"))
+            if (ImGui.BeginTabItem("Visibility", this.TabFlags("Visibility")))
             {
                 dirty |= this.DrawVisibilityTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Layout"))
+            if (ImGui.BeginTabItem("Layout", this.TabFlags("Layout")))
             {
                 dirty |= this.DrawLayoutTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Filtering"))
+            if (ImGui.BeginTabItem("Filtering", this.TabFlags("Filtering")))
             {
                 dirty |= this.DrawFilterTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Sorting"))
+            if (ImGui.BeginTabItem("Sorting", this.TabFlags("Sorting")))
             {
                 dirty |= this.DrawSortTab();
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Other"))
+            if (ImGui.BeginTabItem("Other", this.TabFlags("Other")))
             {
                 dirty |= this.DrawOtherTab();
                 ImGui.EndTabItem();
@@ -249,7 +270,7 @@ public sealed class ConfigWindow : Window
             ImGui.TableSetupColumn("Filter mode", ImGuiTableColumnFlags.WidthFixed, 150f);
             ImGui.TableHeadersRow();
 
-            foreach (ZoneCategory category in Enum.GetValues<ZoneCategory>())
+            foreach (var category in ZoneClassifier.Configurable())
             {
                 if (!this.config.ZoneRules.TryGetValue(category, out var rule))
                 {
@@ -634,6 +655,19 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
+        ImGui.Separator();
+
+        TextHint("Found a bug, or have an idea? Open an issue:");
+
+        if (ImGui.Button("Open the issue tracker"))
+            Dalamud.Utility.Util.OpenLink(IssueUrl);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy link"))
+            ImGui.SetClipboardText(IssueUrl);
+
+        TextHint(IssueUrl);
+
         return dirty;
     }
 
@@ -678,6 +712,9 @@ public sealed class ConfigWindow : Window
         return dirty;
     }
 }
+
+
+
 
 
 

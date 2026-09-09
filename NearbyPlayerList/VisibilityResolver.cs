@@ -184,8 +184,36 @@ public static unsafe class VisibilityResolver
         Service.Chat.Print($"[NPL] available: {string.Join(", ", usable)}");
     }
 
+    // A manual filter click beats the zone rule until you leave the zone. Kept in
+    // memory rather than saved, so it never quietly rewrites the configured mode.
+    private static uint overrideTerritory = uint.MaxValue;
+    private static FilterMode? sessionOverride;
+
+    public static void SetManualFilter(FilterMode mode)
+    {
+        overrideTerritory = Service.ClientState.TerritoryType;
+        sessionOverride = mode;
+    }
+
+    public static bool ZoneOverridesFilter(Configuration config)
+    {
+        if (!config.UseZoneRules)
+            return false;
+
+        return config.ZoneRules.TryGetValue(ZoneClassifier.Current(), out var rule)
+               && rule.Filter != ZoneFilterOverride.NoChange;
+    }
+
     public static FilterMode EffectiveFilter(Configuration config)
     {
+        if (sessionOverride.HasValue)
+        {
+            if (overrideTerritory == Service.ClientState.TerritoryType)
+                return sessionOverride.Value;
+
+            sessionOverride = null;
+        }
+
         if (!config.UseZoneRules)
             return config.Filter;
 
@@ -201,6 +229,7 @@ public static unsafe class VisibilityResolver
         };
     }
 }
+
 
 
 

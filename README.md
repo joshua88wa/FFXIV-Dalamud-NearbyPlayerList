@@ -11,6 +11,8 @@ of each other in those places and clicking the right one is miserable.
 This is not a list of everyone in the zone. It only lists players you can select and
 interact with. For a full zone roster, use Wholist.
 
+![The list in the Occult Crescent](images/screenshot.jpg)
+
 ## Features
 
 - A borderless, transparent, auto-sizing window. Only the player boxes take clicks, so
@@ -131,6 +133,11 @@ own small area even without the modifier held.
 
 **Party detection** uses the party list. Alliance members are not treated as party.
 
+## Problems and suggestions
+
+Open an issue:
+[github.com/joshua88wa/FFXIV-Dalamud-NearbyPlayerList/issues](https://github.com/joshua88wa/FFXIV-Dalamud-NearbyPlayerList/issues)
+
 ## Credits
 
 Showing who is currently being raised is an idea taken from
@@ -159,6 +166,7 @@ alongside it.
 [0BSD](LICENSE). Do whatever you want with it. No attribution, no notice to carry
 around, no conditions at all. The license text is there to say the software comes with
 no warranty, and nothing else.
+
 
 
 
