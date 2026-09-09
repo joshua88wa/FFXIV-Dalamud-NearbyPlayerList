@@ -24,6 +24,13 @@ public class Configuration : IPluginConfiguration
     // Window
     public bool ShowWindow = true;
     public bool LockPosition = false;
+
+    // The pinned corner, in screen coordinates. Stored here rather than left to ImGui's
+    // ini, which saves the top left. Deriving the pinned corner from a restored top left
+    // plus whatever size the window happens to be on the first frame after login puts it
+    // out by the difference between the empty and populated sizes.
+    public float AnchorX = float.NaN;
+    public float AnchorY = float.NaN;
     public bool ShowWindowButtons = true;
     public ButtonModifier ButtonsRequire = ButtonModifier.Ctrl;
     public bool KeepButtonsWhenHidden = true;
@@ -104,6 +111,7 @@ public class Configuration : IPluginConfiguration
         this.Save();
     }
 }
+
 
 
 

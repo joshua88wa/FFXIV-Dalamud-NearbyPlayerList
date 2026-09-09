@@ -24,6 +24,9 @@ public sealed class ListWindow : Window
     // Screen point the list is pinned to. ImGui positions windows by their top left,
     // so holding any other corner means repositioning every frame.
     private Vector2? anchor;
+    private DateTime anchorChangedAt = DateTime.MinValue;
+    private bool anchorDirty;
+    private Vector2 lastSeenAnchor;
 
     private Vector2 Pivot => new(
         this.config.GrowHorizontally == HorizontalGrowth.Left ? 1f : 0f,
@@ -34,6 +37,9 @@ public sealed class ListWindow : Window
     {
         this.config = config;
         this.scanner = scanner;
+        if (!float.IsNaN(config.AnchorX) && !float.IsNaN(config.AnchorY))
+            this.anchor = new Vector2(config.AnchorX, config.AnchorY);
+
         this.RespectCloseHotkey = false;
         this.DisableWindowSounds = true;
     }
@@ -78,7 +84,8 @@ public sealed class ListWindow : Window
                      | ImGuiWindowFlags.NoNav
                      | ImGuiWindowFlags.NoBackground
                      | ImGuiWindowFlags.NoCollapse
-                     | ImGuiWindowFlags.NoDocking;
+                     | ImGuiWindowFlags.NoDocking
+                     | ImGuiWindowFlags.NoSavedSettings;
 
         if (this.config.LockPosition)
             this.Flags |= ImGuiWindowFlags.NoMove;
@@ -200,6 +207,7 @@ public sealed class ListWindow : Window
     {
         // Re-derive the pinned corner from where the window actually ended up.
         this.anchor = ImGui.GetWindowPos() + (ImGui.GetWindowSize() * this.Pivot);
+        this.PersistAnchor(this.anchor.Value);
 
         this.hitRects.Clear();
 
@@ -392,6 +400,44 @@ public sealed class ListWindow : Window
             ImGui.Text($"{entry.CurrentHp:N0} / {entry.MaxHp:N0} HP");
             ImGui.Text($"{entry.Distance:F1} yalms away");
         }
+    }
+
+    // Written only once the anchor has held still for a moment, so dragging does not
+    // write the config file every frame.
+    private void PersistAnchor(Vector2 value)
+    {
+        var savedX = this.config.AnchorX;
+        var savedY = this.config.AnchorY;
+
+        var moved = float.IsNaN(savedX) || float.IsNaN(savedY)
+                    || Math.Abs(savedX - value.X) > 0.5f
+                    || Math.Abs(savedY - value.Y) > 0.5f;
+
+        if (!moved)
+        {
+            this.anchorDirty = false;
+            return;
+        }
+
+        // Restart the clock every time it actually moves, so a long drag writes once
+        // when it stops rather than repeatedly while it is in progress.
+        if (!this.anchorDirty
+            || Math.Abs(this.lastSeenAnchor.X - value.X) > 0.5f
+            || Math.Abs(this.lastSeenAnchor.Y - value.Y) > 0.5f)
+        {
+            this.anchorDirty = true;
+            this.lastSeenAnchor = value;
+            this.anchorChangedAt = DateTime.UtcNow;
+            return;
+        }
+
+        if ((DateTime.UtcNow - this.anchorChangedAt).TotalMilliseconds < 750)
+            return;
+
+        this.config.AnchorX = value.X;
+        this.config.AnchorY = value.Y;
+        this.config.Save();
+        this.anchorDirty = false;
     }
 
     private static IDisposable ImRaiiTooltip()
@@ -724,6 +770,9 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
+
 
 
 
