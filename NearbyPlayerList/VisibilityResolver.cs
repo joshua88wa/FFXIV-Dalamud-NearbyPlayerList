@@ -6,36 +6,63 @@ namespace NearbyPlayerList;
 
 // Decides whether the list should exist at all right now, and which filter mode
 // applies. Both the window and the scanner consult this, so the two cannot disagree.
+public enum ListVisibility
+{
+    Visible,
+
+    // A zone or job rule is suppressing the list. The button strip may still be shown
+    // so the settings stay reachable and the state is visible.
+    HiddenByRule,
+
+    // Nothing renders at all. Currently only PvP.
+    Blocked,
+}
+
 public static unsafe class VisibilityResolver
 {
     private static DateTime lastRaiseCheck = DateTime.MinValue;
     private static bool cachedRaiseAvailable;
 
     public static bool ShouldShow(Configuration config, IReadOnlyCollection<uint> raiseActions)
+        => Evaluate(config, raiseActions, out _) == ListVisibility.Visible;
+
+    public static ListVisibility Evaluate(Configuration config, IReadOnlyCollection<uint> raiseActions, out string reason)
     {
+        reason = string.Empty;
         // Hard off in PvP, and deliberately not a setting. The list is targetable
         // players with live HP and one-click targeting, which in PvP is an enemy list
         // with a target assist. IClientState.IsPvP is used rather than a hand-kept list
         // of zone ids, which would go stale and fail open.
         if (Service.ClientState.IsPvP)
-            return false;
+        {
+            reason = "Disabled in PvP.";
+            return ListVisibility.Blocked;
+        }
 
-        var zone = ZoneCategory.Other;
         if (config.UseZoneRules)
         {
-            zone = ZoneClassifier.Current();
+            var zone = ZoneClassifier.Current();
             if (config.ZoneRules.TryGetValue(zone, out var rule))
             {
                 if (rule.Visibility == ZoneVisibility.Hide)
-                    return false;
+                {
+                    reason = $"Hidden here by the {ZoneClassifier.Label(zone)} zone rule.";
+                    return ListVisibility.HiddenByRule;
+                }
 
                 // An explicit Show for this zone overrides the job rule.
                 if (rule.Visibility == ZoneVisibility.Show)
-                    return true;
+                    return ListVisibility.Visible;
             }
         }
 
-        return !config.UseJobRule || JobAllows(config, raiseActions);
+        if (config.UseJobRule && !JobAllows(config, raiseActions))
+        {
+            reason = "Hidden on this job by the job rule.";
+            return ListVisibility.HiddenByRule;
+        }
+
+        return ListVisibility.Visible;
     }
 
     private static bool JobAllows(Configuration config, IReadOnlyCollection<uint> raiseActions)
@@ -93,6 +120,10 @@ public static unsafe class VisibilityResolver
         var local = Service.Objects.LocalPlayer;
         Service.Log.Information($"[raisedebug] job={local?.ClassJob.RowId}, actions={raiseActions.Count}");
 
+        // Printed with IChatGui, which writes to your own log only. That is useless for
+        // announcing a raise to other players, but exactly right for a diagnostic.
+        var usable = new List<string>();
+
         ActionManager* manager;
         try
         {
@@ -132,7 +163,25 @@ public static unsafe class VisibilityResolver
 
             Service.Log.Information(
                 $"[raisedebug] {id,6} status={status,5} player={isPlayer} job={job,3}  {name}");
+
+            if (status == 0)
+                usable.Add($"{name} ({id})");
         }
+
+        ReportRaiseStatus(local?.ClassJob.RowId, raiseActions.Count, usable);
+    }
+
+    private static void ReportRaiseStatus(uint? job, int checkedCount, List<string> usable)
+    {
+        Service.Chat.Print($"[NPL] job {job}, checked {checkedCount} raise actions.");
+
+        if (usable.Count == 0)
+        {
+            Service.Chat.Print("[NPL] none available. The job rule would hide the list.");
+            return;
+        }
+
+        Service.Chat.Print($"[NPL] available: {string.Join(", ", usable)}");
     }
 
     public static FilterMode EffectiveFilter(Configuration config)
@@ -152,4 +201,6 @@ public static unsafe class VisibilityResolver
         };
     }
 }
+
+
 

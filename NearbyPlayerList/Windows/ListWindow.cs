@@ -17,6 +17,8 @@ public sealed class ListWindow : Window
     private readonly List<(Vector2 Min, Vector2 Max)> hitRects = new();
     private List<PlayerEntry> entries = new();
 
+    private ListVisibility visibility = ListVisibility.Visible;
+    private string visibilityReason = string.Empty;
     private bool centerRequested;
     private bool dragLatch;
     private bool interactive = true;
@@ -55,8 +57,13 @@ public sealed class ListWindow : Window
         if (local == null)
             return false;
 
-        if (!VisibilityResolver.ShouldShow(this.config, this.scanner.RaiseActionsForAvailability))
+        if (this.visibility == ListVisibility.Blocked)
             return false;
+
+        // A zone or job rule leaves the strip behind, so the settings stay reachable
+        // and the suppressed state is visible rather than the list silently vanishing.
+        if (this.visibility == ListVisibility.HiddenByRule)
+            return this.config.ShowWindowButtons && this.config.KeepButtonsWhenHidden;
 
         var inCombat = Service.Condition[ConditionFlag.InCombat];
         var weaponOut = local.StatusFlags.HasFlag(StatusFlags.WeaponOut);
@@ -73,8 +80,12 @@ public sealed class ListWindow : Window
 
     public override void PreDraw()
     {
-        // No point scanning the object table while the list is collapsed.
-        this.entries = this.config.ShowWindow ? this.scanner.Scan() : new List<PlayerEntry>();
+        this.visibility = VisibilityResolver.Evaluate(this.config, this.scanner.RaiseActionsForAvailability, out var reason);
+        this.visibilityReason = reason;
+
+        // No point scanning while collapsed or suppressed by a rule.
+        var scanning = this.config.ShowWindow && this.visibility == ListVisibility.Visible;
+        this.entries = scanning ? this.scanner.Scan() : new List<PlayerEntry>();
 
         this.Flags = ImGuiWindowFlags.NoTitleBar
                      | ImGuiWindowFlags.NoScrollbar
@@ -148,7 +159,7 @@ public sealed class ListWindow : Window
         var stripWidth = this.StripWidth(scale);
         var showStrip = this.config.ShowWindowButtons;
 
-        if (!this.config.ShowWindow || this.entries.Count == 0)
+        if (this.visibility == ListVisibility.HiddenByRule || !this.config.ShowWindow || this.entries.Count == 0)
         {
             return showStrip
                 ? new Vector2(stripWidth, stripHeight) + chrome
@@ -219,7 +230,7 @@ public sealed class ListWindow : Window
         ImGui.SetWindowFontScale(scale);
 
         // Collapsed, or nobody nearby: the strip stands in for the list.
-        if (!this.config.ShowWindow || this.entries.Count == 0)
+        if (this.visibility == ListVisibility.HiddenByRule || !this.config.ShowWindow || this.entries.Count == 0)
         {
             if (this.config.ShowWindowButtons)
                 this.DrawButtonRow(0f, scale);
@@ -509,7 +520,7 @@ public sealed class ListWindow : Window
         }
     }
 
-    private enum Glyph { Close, Show, Settings, Info, FilterAll, FilterHurt, FilterDead }
+    private enum Glyph { Close, Show, Settings, Info, Blocked, FilterAll, FilterHurt, FilterDead }
 
     private bool ButtonsActive() => this.config.ButtonsRequire switch
     {
@@ -518,15 +529,19 @@ public sealed class ListWindow : Window
         _ => true,
     };
 
+    private bool ShowFilterGroup()
+        => this.config.ShowFilterButtons && this.config.ShowWindow && this.visibility == ListVisibility.Visible;
+
     private float StripHeight(float scale) => 16f * scale;
 
     private float StripWidth(float scale)
     {
         var size = this.StripHeight(scale);
         var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var width = (size * 3f) + (spacing * 2f);
+        var buttons = this.visibility == ListVisibility.HiddenByRule ? 2f : 3f;
+        var width = (size * buttons) + (spacing * (buttons - 1f));
 
-        if (this.config.ShowFilterButtons && this.config.ShowWindow)
+        if (this.ShowFilterGroup())
             width += (size * 0.75f) + (size * 3f) + (spacing * 2f);
 
         return width;
@@ -544,7 +559,7 @@ public sealed class ListWindow : Window
         if (!pinnedLeft)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0f, contentWidth - rowWidth));
 
-        var showFilters = this.config.ShowFilterButtons && this.config.ShowWindow;
+        var showFilters = this.ShowFilterGroup();
 
         if (pinnedLeft)
         {
@@ -583,6 +598,25 @@ public sealed class ListWindow : Window
     {
         var active = this.ButtonsActive();
         var gate = this.ModifierHint();
+        if (this.visibility == ListVisibility.HiddenByRule)
+        {
+            this.DrawIconButton(
+                "npl_blocked",
+                size,
+                false,
+                Glyph.Blocked,
+                "List hidden",
+                this.visibilityReason + " Open settings to change it.",
+                false,
+                new Vector4(1f, 0.75f, 0.25f, 1f));
+
+            ImGui.SameLine();
+            if (this.DrawIconButton("npl_config", size, active, Glyph.Settings, "Settings", "Same as typing /npl config." + gate))
+                this.OpenConfig?.Invoke();
+
+            return;
+        }
+
         var hidden = !this.config.ShowWindow;
 
         if (this.DrawIconButton(
@@ -640,7 +674,7 @@ public sealed class ListWindow : Window
         this.config.Filter = mode;
         this.config.Save();
     }
-    private bool DrawIconButton(string id, float size, bool active, Glyph glyph, string title, string body, bool selected = false)
+    private bool DrawIconButton(string id, float size, bool active, Glyph glyph, string title, string body, bool selected = false, Vector4? tint = null)
     {
         if (this.interactive)
             ImGui.InvisibleButton($"##{id}", new Vector2(size, size));
@@ -662,7 +696,8 @@ public sealed class ListWindow : Window
             draw.AddRectFilled(min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, active ? 0.22f : 0.10f)), 3f);
 
         var alpha = selected || active ? 0.95f : hovered ? 0.70f : 0.38f;
-        DrawGlyph(draw, glyph, min, max, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, alpha)), size);
+        var baseColor = tint ?? new Vector4(1f, 1f, 1f, 1f);
+        DrawGlyph(draw, glyph, min, max, ImGui.GetColorU32(baseColor with { W = alpha }), size);
 
         if (hovered)
         {
@@ -712,6 +747,15 @@ public sealed class ListWindow : Window
                 draw.AddCircle(center, (size * 0.5f) - pad + (size * 0.10f), color, 0, thickness);
                 draw.AddLine(new Vector2(center.X, center.Y - (size * 0.14f)), new Vector2(center.X, center.Y + (size * 0.16f)), color, thickness);
                 draw.AddCircleFilled(new Vector2(center.X, center.Y - (size * 0.24f)), thickness * 0.6f, color);
+                break;
+
+            case Glyph.Blocked:
+                draw.AddCircle(center, (size * 0.5f) - pad + (size * 0.08f), color, 0, thickness);
+                draw.AddLine(
+                    center + new Vector2(-size * 0.14f, size * 0.14f),
+                    center + new Vector2(size * 0.14f, -size * 0.14f),
+                    color,
+                    thickness);
                 break;
 
             case Glyph.FilterAll:
@@ -770,6 +814,9 @@ public sealed class ListWindow : Window
         }
     }
 }
+
+
+
 
 
 
