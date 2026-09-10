@@ -645,29 +645,26 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
-        dirty |= this.DrawBinding("Left click", ref this.config.LeftClick);
-        HelpMarker("What each click on a player box does. Raise if dead casts your job's raise on a dead player and does the fallback below on a living one, so one binding covers both without a modifier.");
-        dirty |= this.DrawBinding("Right click", ref this.config.RightClick);
-        dirty |= this.DrawBinding("Middle click", ref this.config.MiddleClick);
-        dirty |= this.DrawBinding("Ctrl + left click", ref this.config.CtrlLeftClick);
-        dirty |= this.DrawBinding("Ctrl + right click", ref this.config.CtrlRightClick);
-        dirty |= this.DrawBinding("Alt + left click", ref this.config.AltLeftClick);
-        dirty |= this.DrawBinding("Alt + right click", ref this.config.AltRightClick);
-
-        if (this.config.AnyRaiseBinding())
+        if (ImGui.BeginTable("##npl_clicks", 3, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
         {
-            ImGui.Indent();
-            ImGui.SetNextItemWidth(220);
-            var fallback = (int)this.config.RaiseFallback;
-            if (ImGui.Combo("If raising is not possible", ref fallback, "Do nothing\0Target\0Soft target\0Focus target\0"))
-            {
-                this.config.RaiseFallback = (ClickAction)fallback;
-                dirty = true;
-            }
+            ImGui.TableSetupColumn("Click", ImGuiTableColumnFlags.WidthFixed, 130f);
+            ImGui.TableSetupColumn("Action", ImGuiTableColumnFlags.WidthFixed, 160f);
+            ImGui.TableSetupColumn("Raise if dead", ImGuiTableColumnFlags.WidthFixed, 100f);
+            ImGui.TableHeadersRow();
 
-            HelpMarker("Used when the player is alive, or when your job has no raise available.");
-            ImGui.Unindent();
+            dirty |= this.DrawBinding("Left click", ref this.config.LeftClick, ref this.config.LeftClickRaise);
+            dirty |= this.DrawBinding("Right click", ref this.config.RightClick, ref this.config.RightClickRaise);
+            dirty |= this.DrawBinding("Middle click", ref this.config.MiddleClick, ref this.config.MiddleClickRaise);
+            dirty |= this.DrawBinding("Ctrl + left click", ref this.config.CtrlLeftClick, ref this.config.CtrlLeftClickRaise);
+            dirty |= this.DrawBinding("Ctrl + right click", ref this.config.CtrlRightClick, ref this.config.CtrlRightClickRaise);
+            dirty |= this.DrawBinding("Alt + left click", ref this.config.AltLeftClick, ref this.config.AltLeftClickRaise);
+            dirty |= this.DrawBinding("Alt + right click", ref this.config.AltRightClick, ref this.config.AltRightClickRaise);
+
+            ImGui.EndTable();
         }
+
+        TextHint("With Raise if dead ticked, that click tries the raise first and falls back to its own action.");
+        HelpMarker("Each click keeps its own fallback. Left click can raise then hard target, while right click raises then soft targets. The fallback is used when the player is alive, or when your job has no raise available.");
 
         ImGui.Separator();
 
@@ -735,16 +732,34 @@ public sealed class ConfigWindow : Window
         ImGui.PopStyleColor();
     }
 
-    private bool DrawBinding(string label, ref ClickAction action)
+    private bool DrawBinding(string label, ref ClickAction action, ref bool raiseFirst)
     {
-        ImGui.SetNextItemWidth(220);
-        var value = (int)action;
-        if (!ImGui.Combo(label, ref value, "Do nothing\0Target\0Soft target\0Focus target\0Raise if dead\0"))
-            return false;
+        var changed = false;
 
-        action = (ClickAction)value;
-        this.config.Save();
-        return true;
+        ImGui.TableNextRow();
+
+        ImGui.TableNextColumn();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(label);
+
+        ImGui.TableNextColumn();
+        ImGui.SetNextItemWidth(-1);
+        var value = (int)action;
+        if (ImGui.Combo($"##act_{label}", ref value, "Do nothing\0Target\0Soft target\0Focus target\0"))
+        {
+            action = (ClickAction)value;
+            changed = true;
+        }
+
+        ImGui.TableNextColumn();
+        var raise = raiseFirst;
+        if (ImGui.Checkbox($"##raise_{label}", ref raise))
+        {
+            raiseFirst = raise;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static bool DrawHighlight(string label, ref bool enabled, ref Vector4 colour, string id)

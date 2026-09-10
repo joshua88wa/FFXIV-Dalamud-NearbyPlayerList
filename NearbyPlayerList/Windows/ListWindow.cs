@@ -327,13 +327,27 @@ public sealed class ListWindow : Window
             var io = ImGui.GetIO();
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-                this.Act(io.KeyCtrl ? this.config.CtrlLeftClick : io.KeyAlt ? this.config.AltLeftClick : this.config.LeftClick, entry);
+            {
+                if (io.KeyCtrl)
+                    this.Act(this.config.CtrlLeftClick, this.config.CtrlLeftClickRaise, entry);
+                else if (io.KeyAlt)
+                    this.Act(this.config.AltLeftClick, this.config.AltLeftClickRaise, entry);
+                else
+                    this.Act(this.config.LeftClick, this.config.LeftClickRaise, entry);
+            }
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                this.Act(io.KeyCtrl ? this.config.CtrlRightClick : io.KeyAlt ? this.config.AltRightClick : this.config.RightClick, entry);
+            {
+                if (io.KeyCtrl)
+                    this.Act(this.config.CtrlRightClick, this.config.CtrlRightClickRaise, entry);
+                else if (io.KeyAlt)
+                    this.Act(this.config.AltRightClick, this.config.AltRightClickRaise, entry);
+                else
+                    this.Act(this.config.RightClick, this.config.RightClickRaise, entry);
+            }
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
-                this.Act(this.config.MiddleClick, entry);
+                this.Act(this.config.MiddleClick, this.config.MiddleClickRaise, entry);
         }
 
         var draw = ImGui.GetWindowDrawList();
@@ -820,23 +834,13 @@ public sealed class ListWindow : Window
         _ => new Vector4(0.60f, 0.60f, 0.60f, 1f),
     };
 
-    private void Act(ClickAction action, PlayerEntry entry)
+    private void Act(ClickAction action, bool raiseFirst, PlayerEntry entry)
     {
-        if (action == ClickAction.Raise)
-        {
-            // Falls through to the fallback when the player is alive, when raising is
-            // switched off, or when this job has no raise at all. A click that does
-            // nothing would be worse than one that just targets.
-            if (entry.IsDead
-                && RaiseCaster.Begin(entry, this.config, this.scanner.RaiseActionsForAvailability))
-                return;
-
-            var fallback = this.config.RaiseFallback;
-            if (fallback != ClickAction.Raise)
-                this.Act(fallback, entry);
-
+        // The binding's own action is its fallback: tried when the player is alive,
+        // or when this job has no raise available.
+        if (raiseFirst && entry.IsDead
+            && RaiseCaster.Begin(entry, this.config, this.scanner.RaiseActionsForAvailability))
             return;
-        }
 
         switch (action)
         {

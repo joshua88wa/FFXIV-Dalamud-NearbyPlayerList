@@ -90,7 +90,7 @@ public class Configuration : IPluginConfiguration
 
     public bool ShowRaiseInProgress = true;
     public bool ShowHpNumbers = false;
-    public ClickAction LeftClick = ClickAction.Raise;
+    public ClickAction LeftClick = ClickAction.HardTarget;
     public ClickAction RightClick = ClickAction.SoftTarget;
     public ClickAction MiddleClick = ClickAction.None;
     public ClickAction CtrlLeftClick = ClickAction.None;
@@ -98,18 +98,46 @@ public class Configuration : IPluginConfiguration
     public ClickAction AltLeftClick = ClickAction.None;
     public ClickAction AltRightClick = ClickAction.None;
 
+    // Per binding: try the raise first, then fall through to that binding's own
+    // action. Each click keeps its own fallback rather than sharing one.
+    public bool LeftClickRaise = true;
+    public bool RightClickRaise = false;
+    public bool MiddleClickRaise = false;
+    public bool CtrlLeftClickRaise = false;
+    public bool CtrlRightClickRaise = false;
+    public bool AltLeftClickRaise = false;
+    public bool AltRightClickRaise = false;
+
     [NonSerialized] private IDalamudPluginInterface? pluginInterface;
 
     public void Initialize(IDalamudPluginInterface pi) => this.pluginInterface = pi;
 
     public bool AnyRaiseBinding()
-        => this.LeftClick == ClickAction.Raise
-           || this.RightClick == ClickAction.Raise
-           || this.MiddleClick == ClickAction.Raise
-           || this.CtrlLeftClick == ClickAction.Raise
-           || this.CtrlRightClick == ClickAction.Raise
-           || this.AltLeftClick == ClickAction.Raise
-           || this.AltRightClick == ClickAction.Raise;
+        => this.LeftClickRaise || this.RightClickRaise || this.MiddleClickRaise
+           || this.CtrlLeftClickRaise || this.CtrlRightClickRaise
+           || this.AltLeftClickRaise || this.AltRightClickRaise;
+
+    // ClickAction.Raise was briefly its own action. Anything saved that way becomes
+    // the old shared fallback plus a ticked raise box, so nobody loses a binding.
+    public void MigrateRaiseBindings()
+    {
+        Convert(ref this.LeftClick, ref this.LeftClickRaise);
+        Convert(ref this.RightClick, ref this.RightClickRaise);
+        Convert(ref this.MiddleClick, ref this.MiddleClickRaise);
+        Convert(ref this.CtrlLeftClick, ref this.CtrlLeftClickRaise);
+        Convert(ref this.CtrlRightClick, ref this.CtrlRightClickRaise);
+        Convert(ref this.AltLeftClick, ref this.AltLeftClickRaise);
+        Convert(ref this.AltRightClick, ref this.AltRightClickRaise);
+
+        void Convert(ref ClickAction action, ref bool raise)
+        {
+            if (action != ClickAction.Raise)
+                return;
+
+            action = this.RaiseFallback == ClickAction.Raise ? ClickAction.HardTarget : this.RaiseFallback;
+            raise = true;
+        }
+    }
 
     public void Save() => this.pluginInterface?.SavePluginConfig(this);
 

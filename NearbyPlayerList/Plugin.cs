@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -22,6 +22,7 @@ public sealed class Plugin : IDalamudPlugin
 
         this.config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         this.config.Initialize(pluginInterface);
+        this.config.MigrateRaiseBindings();
 
         this.scanner = new PlayerScanner(this.config);
         var scanner = this.scanner;
