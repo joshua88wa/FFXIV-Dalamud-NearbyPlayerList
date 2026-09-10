@@ -85,8 +85,8 @@ public sealed class ListWindow : Window
 
         // Once per frame, not once per box: it queries action state for every known
         // raise, which is not something to repeat for each row.
-        this.raiseReady = this.config.EnableClickToRaise
-                          && this.config.ShowRaiseReady
+        this.raiseReady = this.config.ShowRaiseReady
+                          && this.config.AnyRaiseBinding()
                           && RaiseCaster.InstantReady(this.scanner.RaiseActionsForAvailability, this.config);
 
         this.visibility = VisibilityResolver.Evaluate(this.config, this.scanner.RaiseActionsForAvailability, out var reason);
@@ -324,17 +324,16 @@ public sealed class ListWindow : Window
 
         if (this.interactive)
         {
-            if (this.RaiseTriggered(entry))
-            {
-                this.Act(ClickAction.Raise, entry);
-            }
-            else
-            {
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-                    Act(this.config.LeftClick, entry);
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-                    Act(this.config.RightClick, entry);
-            }
+            var io = ImGui.GetIO();
+
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                this.Act(io.KeyCtrl ? this.config.CtrlLeftClick : io.KeyAlt ? this.config.AltLeftClick : this.config.LeftClick, entry);
+
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                this.Act(io.KeyCtrl ? this.config.CtrlRightClick : io.KeyAlt ? this.config.AltRightClick : this.config.RightClick, entry);
+
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
+                this.Act(this.config.MiddleClick, entry);
         }
 
         var draw = ImGui.GetWindowDrawList();
@@ -821,23 +820,6 @@ public sealed class ListWindow : Window
         _ => new Vector4(0.60f, 0.60f, 0.60f, 1f),
     };
 
-    // Deliberately not a plain click: that has to stay targeting. Shift moves the
-    // window and Ctrl drives the strip, so Alt is the free one.
-    private bool RaiseTriggered(PlayerEntry entry)
-    {
-        if (!this.config.EnableClickToRaise || !entry.IsDead)
-            return false;
-
-        var io = ImGui.GetIO();
-
-        return this.config.RaiseWith switch
-        {
-            RaiseTrigger.CtrlClick => io.KeyCtrl && ImGui.IsItemClicked(ImGuiMouseButton.Left),
-            RaiseTrigger.MiddleClick => ImGui.IsItemClicked(ImGuiMouseButton.Middle),
-            _ => io.KeyAlt && ImGui.IsItemClicked(ImGuiMouseButton.Left),
-        };
-    }
-
     private void Act(ClickAction action, PlayerEntry entry)
     {
         if (action == ClickAction.Raise)
@@ -845,7 +827,7 @@ public sealed class ListWindow : Window
             // Falls through to the fallback when the player is alive, when raising is
             // switched off, or when this job has no raise at all. A click that does
             // nothing would be worse than one that just targets.
-            if (this.config.EnableClickToRaise && entry.IsDead
+            if (entry.IsDead
                 && RaiseCaster.Begin(entry, this.config, this.scanner.RaiseActionsForAvailability))
                 return;
 

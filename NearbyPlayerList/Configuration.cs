@@ -12,7 +12,6 @@ public enum HorizontalGrowth { Right, Left }
 public enum VerticalGrowth { Down, Up }
 public enum SortMode { Role, Alphabetical, MissingHp }
 public enum TieBreak { Role, Alphabetical }
-public enum RaiseTrigger { AltClick, CtrlClick, MiddleClick }
 public enum FilterMode { All, BelowHealthThreshold, DeadOnly }
 public enum HideCondition { Never, InCombat, OutOfCombat, WeaponDrawn, WeaponSheathed }
 public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget, Raise }
@@ -85,21 +84,32 @@ public class Configuration : IPluginConfiguration
     public Vector4 FocusTargetColor = new(0.80f, 0.45f, 1.00f, 1f);   // violet
     public Vector4 PartyColor = new(0.25f, 0.85f, 0.35f, 1f);         // green
 
-    // Click to raise
-    public bool EnableClickToRaise = false;
-    public RaiseTrigger RaiseWith = RaiseTrigger.AltClick;
     public bool UseSwiftcast = true;
     public bool ShowRaiseReady = true;
     public ClickAction RaiseFallback = ClickAction.HardTarget;
 
     public bool ShowRaiseInProgress = true;
     public bool ShowHpNumbers = false;
-    public ClickAction LeftClick = ClickAction.HardTarget;
+    public ClickAction LeftClick = ClickAction.Raise;
     public ClickAction RightClick = ClickAction.SoftTarget;
+    public ClickAction MiddleClick = ClickAction.None;
+    public ClickAction CtrlLeftClick = ClickAction.None;
+    public ClickAction CtrlRightClick = ClickAction.None;
+    public ClickAction AltLeftClick = ClickAction.None;
+    public ClickAction AltRightClick = ClickAction.None;
 
     [NonSerialized] private IDalamudPluginInterface? pluginInterface;
 
     public void Initialize(IDalamudPluginInterface pi) => this.pluginInterface = pi;
+
+    public bool AnyRaiseBinding()
+        => this.LeftClick == ClickAction.Raise
+           || this.RightClick == ClickAction.Raise
+           || this.MiddleClick == ClickAction.Raise
+           || this.CtrlLeftClick == ClickAction.Raise
+           || this.CtrlRightClick == ClickAction.Raise
+           || this.AltLeftClick == ClickAction.Raise
+           || this.AltRightClick == ClickAction.Raise;
 
     public void Save() => this.pluginInterface?.SavePluginConfig(this);
 

@@ -645,47 +645,18 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
-        var clickRaise = this.config.EnableClickToRaise;
-        if (ImGui.Checkbox("Raise from the list", ref clickRaise))
-        {
-            this.config.EnableClickToRaise = clickRaise;
-            dirty = true;
-        }
+        dirty |= this.DrawBinding("Left click", ref this.config.LeftClick);
+        HelpMarker("What each click on a player box does. Raise if dead casts your job's raise on a dead player and does the fallback below on a living one, so one binding covers both without a modifier.");
+        dirty |= this.DrawBinding("Right click", ref this.config.RightClick);
+        dirty |= this.DrawBinding("Middle click", ref this.config.MiddleClick);
+        dirty |= this.DrawBinding("Ctrl + left click", ref this.config.CtrlLeftClick);
+        dirty |= this.DrawBinding("Ctrl + right click", ref this.config.CtrlRightClick);
+        dirty |= this.DrawBinding("Alt + left click", ref this.config.AltLeftClick);
+        dirty |= this.DrawBinding("Alt + right click", ref this.config.AltRightClick);
 
-        HelpMarker("Master switch for raising from the list. With it off, both the modifier below and the Raise if dead click action fall back to targeting.");
-
-        if (clickRaise)
+        if (this.config.AnyRaiseBinding())
         {
             ImGui.Indent();
-
-            ImGui.SetNextItemWidth(220);
-            var trigger = (int)this.config.RaiseWith;
-            if (ImGui.Combo("Raise with", ref trigger, "Alt + left click\0Ctrl + left click\0Middle click\0"))
-            {
-                this.config.RaiseWith = (RaiseTrigger)trigger;
-                dirty = true;
-            }
-
-            HelpMarker("Shift moves the list and Ctrl drives the button strip, so Alt is the one that is free by default.");
-
-            var swift = this.config.UseSwiftcast;
-            if (ImGui.Checkbox("Use Swiftcast when the raise has a cast time", ref swift))
-            {
-                this.config.UseSwiftcast = swift;
-                dirty = true;
-            }
-
-            HelpMarker("Skipped when an instant cast is already up, so a Red Mage mid-Dualcast does not burn Swiftcast for nothing.");
-
-            var ready = this.config.ShowRaiseReady;
-            if (ImGui.Checkbox("Show \"Raise ready\" instead of \"Dead\"", ref ready))
-            {
-                this.config.ShowRaiseReady = ready;
-                dirty = true;
-            }
-
-            HelpMarker("Tells you before you click whether the raise would be instant, rather than silently starting a long hard cast.");
-
             ImGui.SetNextItemWidth(220);
             var fallback = (int)this.config.RaiseFallback;
             if (ImGui.Combo("If raising is not possible", ref fallback, "Do nothing\0Target\0Soft target\0Focus target\0"))
@@ -694,8 +665,7 @@ public sealed class ConfigWindow : Window
                 dirty = true;
             }
 
-            HelpMarker("Used when the player is alive, or when your job has no raise. Without it, a Warrior clicking a corpse would do nothing at all.");
-
+            HelpMarker("Used when the player is alive, or when your job has no raise available.");
             ImGui.Unindent();
         }
 
@@ -708,24 +678,23 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
-        ImGui.Separator();
-
-        ImGui.SetNextItemWidth(220);
-        var left = (int)this.config.LeftClick;
-        if (ImGui.Combo("Left click", ref left, "Do nothing\0Target\0Soft target\0Focus target\0Raise if dead\0"))
+        var swift = this.config.UseSwiftcast;
+        if (ImGui.Checkbox("Use Swiftcast when the raise has a cast time", ref swift))
         {
-            this.config.LeftClick = (ClickAction)left;
+            this.config.UseSwiftcast = swift;
             dirty = true;
         }
 
-        ImGui.SetNextItemWidth(220);
-        var right = (int)this.config.RightClick;
-        if (ImGui.Combo("Right click", ref right, "Do nothing\0Target\0Soft target\0Focus target\0Raise if dead\0"))
+        HelpMarker("Raising from the list targets the player, uses Swiftcast if the raise has a cast time and Swiftcast is up, then casts the raise once the instant cast lands. Swiftcast is skipped when an instant cast is already active, such as a Red Mage mid-Dualcast, and when the raise is already instant. The raise used is whichever one your job currently has available, so phantom job raises work too.");
+
+        var ready = this.config.ShowRaiseReady;
+        if (ImGui.Checkbox("Show \"Raise ready\" instead of \"Dead\"", ref ready))
         {
-            this.config.RightClick = (ClickAction)right;
+            this.config.ShowRaiseReady = ready;
             dirty = true;
         }
 
+        HelpMarker("Tells you before you click whether the raise would go off instantly, rather than silently starting a long hard cast.");
         ImGui.Separator();
 
         TextHint("Found a bug, or have an idea? Open an issue:");
@@ -764,6 +733,18 @@ public sealed class ConfigWindow : Window
         ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
         ImGui.TextWrapped(text);
         ImGui.PopStyleColor();
+    }
+
+    private bool DrawBinding(string label, ref ClickAction action)
+    {
+        ImGui.SetNextItemWidth(220);
+        var value = (int)action;
+        if (!ImGui.Combo(label, ref value, "Do nothing\0Target\0Soft target\0Focus target\0Raise if dead\0"))
+            return false;
+
+        action = (ClickAction)value;
+        this.config.Save();
+        return true;
     }
 
     private static bool DrawHighlight(string label, ref bool enabled, ref Vector4 colour, string id)
