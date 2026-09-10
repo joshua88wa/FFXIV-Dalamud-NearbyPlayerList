@@ -890,7 +890,11 @@ public sealed class ListWindow : Window
                 Service.Targets.SoftTarget = entry.GameObject;
                 break;
             case ClickAction.FocusTarget:
-                Service.Targets.FocusTarget = entry.GameObject;
+                // Toggles. Focus target has no natural way to clear it by clicking
+                // elsewhere, unlike a hard target, so clicking the current focus
+                // again drops it.
+                Service.Targets.FocusTarget =
+                    Service.Targets.FocusTarget?.EntityId == entry.EntityId ? null : entry.GameObject;
                 break;
         }
     }

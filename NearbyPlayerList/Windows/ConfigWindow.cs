@@ -663,7 +663,7 @@ public sealed class ConfigWindow : Window
         }
 
         TextHint("With Raise if dead ticked, that click tries the raise first and falls back to its own action.");
-        HelpMarker("Each click keeps its own fallback. Left click can raise then hard target, while right click raises then soft targets. The fallback is used when the player is alive, or when your job has no raise available.");
+        HelpMarker("Each click keeps its own fallback. Left click can raise then hard target, while right click raises then soft targets. The fallback is used when the player is alive, or when your job has no raise available. Focus target toggles: clicking the player who is already your focus clears it.");
 
         ImGui.Separator();
 
