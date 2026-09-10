@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Reflection;
@@ -12,6 +12,7 @@ public enum HorizontalGrowth { Right, Left }
 public enum VerticalGrowth { Down, Up }
 public enum SortMode { Role, Alphabetical, MissingHp }
 public enum TieBreak { Role, Alphabetical }
+public enum RaiseTrigger { AltClick, CtrlClick, MiddleClick }
 public enum FilterMode { All, BelowHealthThreshold, DeadOnly }
 public enum HideCondition { Never, InCombat, OutOfCombat, WeaponDrawn, WeaponSheathed }
 public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget }
@@ -83,6 +84,12 @@ public class Configuration : IPluginConfiguration
     public Vector4 SoftTargetColor = new(0.35f, 0.85f, 1.00f, 1f);    // cyan
     public Vector4 FocusTargetColor = new(0.80f, 0.45f, 1.00f, 1f);   // violet
     public Vector4 PartyColor = new(0.25f, 0.85f, 0.35f, 1f);         // green
+
+    // Click to raise
+    public bool EnableClickToRaise = false;
+    public RaiseTrigger RaiseWith = RaiseTrigger.AltClick;
+    public bool UseSwiftcast = true;
+    public bool ShowRaiseReady = true;
 
     public bool ShowRaiseInProgress = true;
     public bool ShowHpNumbers = false;

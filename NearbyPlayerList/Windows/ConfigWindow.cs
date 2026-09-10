@@ -645,6 +645,52 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
+        var clickRaise = this.config.EnableClickToRaise;
+        if (ImGui.Checkbox("Raise from the list", ref clickRaise))
+        {
+            this.config.EnableClickToRaise = clickRaise;
+            dirty = true;
+        }
+
+        HelpMarker("Casts your job's raise on a dead player straight from their box, using Swiftcast first if the raise has a cast time and Swiftcast is up. Plain clicking still just targets.");
+
+        if (clickRaise)
+        {
+            ImGui.Indent();
+
+            ImGui.SetNextItemWidth(220);
+            var trigger = (int)this.config.RaiseWith;
+            if (ImGui.Combo("Raise with", ref trigger, "Alt + left click\0Ctrl + left click\0Middle click\0"))
+            {
+                this.config.RaiseWith = (RaiseTrigger)trigger;
+                dirty = true;
+            }
+
+            HelpMarker("Shift moves the list and Ctrl drives the button strip, so Alt is the one that is free by default.");
+
+            var swift = this.config.UseSwiftcast;
+            if (ImGui.Checkbox("Use Swiftcast when the raise has a cast time", ref swift))
+            {
+                this.config.UseSwiftcast = swift;
+                dirty = true;
+            }
+
+            HelpMarker("Skipped when an instant cast is already up, so a Red Mage mid-Dualcast does not burn Swiftcast for nothing.");
+
+            var ready = this.config.ShowRaiseReady;
+            if (ImGui.Checkbox("Show \"Raise ready\" instead of \"Dead\"", ref ready))
+            {
+                this.config.ShowRaiseReady = ready;
+                dirty = true;
+            }
+
+            HelpMarker("Tells you before you click whether the raise would be instant, rather than silently starting a long hard cast.");
+
+            ImGui.Unindent();
+        }
+
+        ImGui.Separator();
+
         var showRaise = this.config.ShowRaiseInProgress;
         if (ImGui.Checkbox("Show when a player is being raised by someone else", ref showRaise))
         {
