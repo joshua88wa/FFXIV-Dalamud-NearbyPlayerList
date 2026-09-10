@@ -685,13 +685,13 @@ public sealed class ConfigWindow : Window
         HelpMarker("Raising from the list targets the player, uses Swiftcast if the raise has a cast time and Swiftcast is up, then casts the raise once the instant cast lands. Swiftcast is skipped when an instant cast is already active, such as a Red Mage mid-Dualcast, and when the raise is already instant. The raise used is whichever one your job currently has available, so phantom job raises work too.");
 
         var ready = this.config.ShowRaiseReady;
-        if (ImGui.Checkbox("Show \"Raise ready\" instead of \"Dead\"", ref ready))
+        if (ImGui.Checkbox("Show raise readiness instead of \"Dead\"", ref ready))
         {
             this.config.ShowRaiseReady = ready;
             dirty = true;
         }
 
-        HelpMarker("Tells you before you click whether the raise would go off instantly, rather than silently starting a long hard cast.");
+        HelpMarker("Replaces the Dead label with what would actually happen if you clicked. Instant raise ready means no cast bar, because the raise is instant, an instant cast is already up, or Swiftcast is available. Raise ready means a normal cast. Not enough MP means exactly that. Anyone out of range, or on a job with no raise, stays as Dead.");
         ImGui.Separator();
 
         TextHint("Found a bug, or have an idea? Open an issue:");

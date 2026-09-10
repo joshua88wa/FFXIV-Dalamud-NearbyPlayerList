@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.ClientState.Objects.Types;
@@ -9,6 +9,14 @@ namespace NearbyPlayerList;
 // Raising from the list. A click is one user action, but Swiftcast and the raise are
 // two separate casts, so this holds a small pending state and fires the raise on a
 // later frame once the instant-cast buff has actually landed.
+public enum RaiseReadiness
+{
+    None,
+    Ready,
+    InstantReady,
+    NoMp,
+}
+
 public static unsafe class RaiseCaster
 {
     private const uint SwiftcastAction = 7561;
@@ -28,6 +36,32 @@ public static unsafe class RaiseCaster
     // The raise this job would actually use. Several may report usable at once, for
     // example a phantom job raise alongside a job one, so a match on the current job
     // wins and anything else is a fallback.
+    public static uint? PickRaise(IReadOnlyCollection<uint> raiseActions, ulong targetId)
+    {
+        var manager = ActionManager.Instance();
+        if (manager == null)
+            return null;
+
+        var sheet = Service.Data.GetExcelSheet<Lumina.Excel.Sheets.Action>();
+        var job = Service.Objects.LocalPlayer?.ClassJob.RowId ?? 0;
+
+        uint? fallback = null;
+
+        foreach (var id in raiseActions)
+        {
+            if (manager->GetActionStatus(ActionType.Action, id, targetId) != 0)
+                continue;
+
+            var row = sheet?.GetRowOrDefault(id);
+            if (row != null && row.Value.ClassJob.RowId == job)
+                return id;
+
+            fallback ??= id;
+        }
+
+        return fallback;
+    }
+
     public static uint? PickRaise(IReadOnlyCollection<uint> raiseActions)
     {
         var local = Service.Objects.LocalPlayer;
@@ -102,19 +136,73 @@ public static unsafe class RaiseCaster
         return row?.Cast100ms ?? 0;
     }
 
+    // Status codes GetActionStatus returns, which are LogMessage row ids.
+    private const uint StatusNotEnoughMp = 568;
+    private const uint StatusWrongClass = 574;
+
     public static bool CanRaise(IReadOnlyCollection<uint> raiseActions) => PickRaise(raiseActions) != null;
+
+    // Asked against the actual target, so range and other target-specific conditions
+    // are evaluated. The target-less version cannot see those, which is why a player
+    // across the zone used to read as raiseable.
+    public static RaiseReadiness Evaluate(IReadOnlyCollection<uint> raiseActions, ulong targetId, Configuration config)
+    {
+        var manager = ActionManager.Instance();
+        if (manager == null)
+            return RaiseReadiness.None;
+
+        var sheet = Service.Data.GetExcelSheet<Lumina.Excel.Sheets.Action>();
+        var job = Service.Objects.LocalPlayer?.ClassJob.RowId ?? 0;
+
+        uint? castable = null;
+        var noMp = false;
+
+        foreach (var id in raiseActions)
+        {
+            var status = manager->GetActionStatus(ActionType.Action, id, targetId);
+
+            if (status == StatusNotEnoughMp)
+            {
+                noMp = true;
+                continue;
+            }
+
+            if (status != 0)
+                continue;
+
+            castable = id;
+
+            var row = sheet?.GetRowOrDefault(id);
+            if (row != null && row.Value.ClassJob.RowId == job)
+                break;
+        }
+
+        if (castable == null)
+        {
+            // Out of range, wrong class and anything else all read as plain Dead. Only
+            // a missing resource is worth calling out, since that is the one the player
+            // can do something about while standing where they are.
+            return noMp ? RaiseReadiness.NoMp : RaiseReadiness.None;
+        }
+
+        if (CastTimeOf(castable.Value) == 0 || HasInstantBuff())
+            return RaiseReadiness.InstantReady;
+
+        return config.UseSwiftcast && SwiftcastReady()
+            ? RaiseReadiness.InstantReady
+            : RaiseReadiness.Ready;
+    }
 
     // Returns false when there is nothing to cast, so the caller can fall back to
     // targeting instead. A job with no raise clicking a corpse should still select it.
 
     public static bool Begin(PlayerEntry entry, Configuration config, IReadOnlyCollection<uint> raiseActions)
     {
-        var action = PickRaise(raiseActions);
+        // Picked against the real target so an out of range player does not start a
+        // cast the game will refuse.
+        var action = PickRaise(raiseActions, entry.GameObject.GameObjectId);
         if (action == null)
-        {
-
             return false;
-        }
 
         var manager = ActionManager.Instance();
         if (manager == null)

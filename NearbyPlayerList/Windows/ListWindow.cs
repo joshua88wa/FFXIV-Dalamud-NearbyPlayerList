@@ -18,7 +18,9 @@ public sealed class ListWindow : Window
     private List<PlayerEntry> entries = new();
 
     private ListVisibility visibility = ListVisibility.Visible;
-    private bool raiseReady;
+    private bool showReadiness;
+    private readonly Dictionary<uint, RaiseReadiness> readiness = new();
+    private DateTime lastReadinessCheck = DateTime.MinValue;
     private string visibilityReason = string.Empty;
     private bool centerRequested;
     private bool dragLatch;
@@ -83,11 +85,7 @@ public sealed class ListWindow : Window
     {
         RaiseCaster.Tick();
 
-        // Once per frame, not once per box: it queries action state for every known
-        // raise, which is not something to repeat for each row.
-        this.raiseReady = this.config.ShowRaiseReady
-                          && this.config.AnyRaiseBinding()
-                          && RaiseCaster.InstantReady(this.scanner.RaiseActionsForAvailability, this.config);
+        this.showReadiness = this.config.ShowRaiseReady && this.config.AnyRaiseBinding();
 
         this.visibility = VisibilityResolver.Evaluate(this.config, this.scanner.RaiseActionsForAvailability, out var reason);
         this.visibilityReason = reason;
@@ -229,6 +227,7 @@ public sealed class ListWindow : Window
         this.anchor = ImGui.GetWindowPos() + (ImGui.GetWindowSize() * this.Pivot);
         this.PersistAnchor(this.anchor.Value);
 
+        this.RefreshReadiness();
         this.hitRects.Clear();
 
         // Shift makes the boxes non-interactive for this frame. Click-through leaves only a
@@ -444,6 +443,33 @@ public sealed class ListWindow : Window
 
     // Written only once the anchor has held still for a moment, so dragging does not
     // write the config file every frame.
+    // Only the dead are checked, and only four times a second: each check asks the game
+    // about every known raise action against that specific player.
+    private void RefreshReadiness()
+    {
+        if (!this.showReadiness)
+        {
+            this.readiness.Clear();
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if ((now - this.lastReadinessCheck).TotalMilliseconds < 250)
+            return;
+
+        this.lastReadinessCheck = now;
+        this.readiness.Clear();
+
+        foreach (var entry in this.entries)
+        {
+            if (!entry.IsDead)
+                continue;
+
+            this.readiness[entry.EntityId] =
+                RaiseCaster.Evaluate(this.scanner.RaiseActionsForAvailability, entry.GameObject.GameObjectId, this.config);
+        }
+    }
+
     private void PersistAnchor(Vector2 value)
     {
         var savedX = this.config.AnchorX;
@@ -509,7 +535,20 @@ public sealed class ListWindow : Window
         else if (entry.IsDead && entry.AlreadyRaised)
             label = "Raised";
         else if (entry.IsDead)
-            label = this.raiseReady && this.config.ShowRaiseReady ? "Raise ready" : "Dead";
+        {
+            label = "Dead";
+
+            if (this.showReadiness && this.readiness.TryGetValue(entry.EntityId, out var state))
+            {
+                label = state switch
+                {
+                    RaiseReadiness.InstantReady => "Instant raise ready",
+                    RaiseReadiness.Ready => "Raise ready",
+                    RaiseReadiness.NoMp => "Not enough MP",
+                    _ => "Dead",
+                };
+            }
+        }
         else if (this.config.ShowHpNumbers)
             label = $"{entry.CurrentHp:N0} / {entry.MaxHp:N0}";
         else

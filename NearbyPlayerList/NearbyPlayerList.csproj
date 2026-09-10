@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.5.0.3</Version>
+    <Version>0.5.0.4</Version>
     <Authors>joshua88wa</Authors>
     <Company></Company>
     <Description>Clickable list of nearby targetable players, for healing and raising in Field Operations.</Description>
