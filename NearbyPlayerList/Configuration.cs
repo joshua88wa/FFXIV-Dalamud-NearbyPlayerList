@@ -15,7 +15,7 @@ public enum TieBreak { Role, Alphabetical }
 public enum RaiseTrigger { AltClick, CtrlClick, MiddleClick }
 public enum FilterMode { All, BelowHealthThreshold, DeadOnly }
 public enum HideCondition { Never, InCombat, OutOfCombat, WeaponDrawn, WeaponSheathed }
-public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget }
+public enum ClickAction { None, HardTarget, SoftTarget, FocusTarget, Raise }
 public enum ButtonModifier { Ctrl, Alt, None }
 
 [Serializable]
@@ -90,6 +90,7 @@ public class Configuration : IPluginConfiguration
     public RaiseTrigger RaiseWith = RaiseTrigger.AltClick;
     public bool UseSwiftcast = true;
     public bool ShowRaiseReady = true;
+    public ClickAction RaiseFallback = ClickAction.HardTarget;
 
     public bool ShowRaiseInProgress = true;
     public bool ShowHpNumbers = false;

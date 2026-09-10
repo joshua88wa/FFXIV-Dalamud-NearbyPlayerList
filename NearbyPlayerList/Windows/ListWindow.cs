@@ -326,7 +326,7 @@ public sealed class ListWindow : Window
         {
             if (this.RaiseTriggered(entry))
             {
-                RaiseCaster.Begin(entry, this.config, this.scanner.RaiseActionsForAvailability);
+                this.Act(ClickAction.Raise, entry);
             }
             else
             {
@@ -838,8 +838,24 @@ public sealed class ListWindow : Window
         };
     }
 
-    private static void Act(ClickAction action, PlayerEntry entry)
+    private void Act(ClickAction action, PlayerEntry entry)
     {
+        if (action == ClickAction.Raise)
+        {
+            // Falls through to the fallback when the player is alive, when raising is
+            // switched off, or when this job has no raise at all. A click that does
+            // nothing would be worse than one that just targets.
+            if (this.config.EnableClickToRaise && entry.IsDead
+                && RaiseCaster.Begin(entry, this.config, this.scanner.RaiseActionsForAvailability))
+                return;
+
+            var fallback = this.config.RaiseFallback;
+            if (fallback != ClickAction.Raise)
+                this.Act(fallback, entry);
+
+            return;
+        }
+
         switch (action)
         {
             case ClickAction.HardTarget:

@@ -102,18 +102,23 @@ public static unsafe class RaiseCaster
         return row?.Cast100ms ?? 0;
     }
 
-    public static void Begin(PlayerEntry entry, Configuration config, IReadOnlyCollection<uint> raiseActions)
+    public static bool CanRaise(IReadOnlyCollection<uint> raiseActions) => PickRaise(raiseActions) != null;
+
+    // Returns false when there is nothing to cast, so the caller can fall back to
+    // targeting instead. A job with no raise clicking a corpse should still select it.
+
+    public static bool Begin(PlayerEntry entry, Configuration config, IReadOnlyCollection<uint> raiseActions)
     {
         var action = PickRaise(raiseActions);
         if (action == null)
         {
-            Service.Chat.Print("[NPL] No raise available right now.");
-            return;
+
+            return false;
         }
 
         var manager = ActionManager.Instance();
         if (manager == null)
-            return;
+            return false;
 
         Service.Targets.Target = entry.GameObject;
 
@@ -130,10 +135,11 @@ public static unsafe class RaiseCaster
             pendingAction = action.Value;
             pendingTarget = targetId;
             pendingExpires = DateTime.UtcNow + PendingTimeout;
-            return;
+            return true;
         }
 
         manager->UseAction(ActionType.Action, action.Value, targetId);
+        return true;
     }
 
     public static void Tick()

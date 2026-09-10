@@ -652,7 +652,7 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
-        HelpMarker("Casts your job's raise on a dead player straight from their box, using Swiftcast first if the raise has a cast time and Swiftcast is up. Plain clicking still just targets.");
+        HelpMarker("Master switch for raising from the list. With it off, both the modifier below and the Raise if dead click action fall back to targeting.");
 
         if (clickRaise)
         {
@@ -686,6 +686,16 @@ public sealed class ConfigWindow : Window
 
             HelpMarker("Tells you before you click whether the raise would be instant, rather than silently starting a long hard cast.");
 
+            ImGui.SetNextItemWidth(220);
+            var fallback = (int)this.config.RaiseFallback;
+            if (ImGui.Combo("If raising is not possible", ref fallback, "Do nothing\0Target\0Soft target\0Focus target\0"))
+            {
+                this.config.RaiseFallback = (ClickAction)fallback;
+                dirty = true;
+            }
+
+            HelpMarker("Used when the player is alive, or when your job has no raise. Without it, a Warrior clicking a corpse would do nothing at all.");
+
             ImGui.Unindent();
         }
 
@@ -702,7 +712,7 @@ public sealed class ConfigWindow : Window
 
         ImGui.SetNextItemWidth(220);
         var left = (int)this.config.LeftClick;
-        if (ImGui.Combo("Left click", ref left, "Do nothing\0Target\0Soft target\0Focus target\0"))
+        if (ImGui.Combo("Left click", ref left, "Do nothing\0Target\0Soft target\0Focus target\0Raise if dead\0"))
         {
             this.config.LeftClick = (ClickAction)left;
             dirty = true;
@@ -710,7 +720,7 @@ public sealed class ConfigWindow : Window
 
         ImGui.SetNextItemWidth(220);
         var right = (int)this.config.RightClick;
-        if (ImGui.Combo("Right click", ref right, "Do nothing\0Target\0Soft target\0Focus target\0"))
+        if (ImGui.Combo("Right click", ref right, "Do nothing\0Target\0Soft target\0Focus target\0Raise if dead\0"))
         {
             this.config.RightClick = (ClickAction)right;
             dirty = true;
