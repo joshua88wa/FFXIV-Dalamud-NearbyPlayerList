@@ -205,7 +205,10 @@ public sealed class ListWindow : Window
             return true;
         }
 
-        if (io.KeyShift)
+        // Shift only grabs the window when the window can actually move. Locked, it
+        // would swallow clicks for no reason, and the game uses Shift for plenty of
+        // things that have nothing to do with this list.
+        if (io.KeyShift && !this.config.LockPosition)
         {
             if (io.MouseDown[0])
                 this.dragLatch = true;
@@ -234,7 +237,7 @@ public sealed class ListWindow : Window
 
         // Shift makes the boxes non-interactive for this frame. Click-through leaves only a
         // couple of pixels of grabbable space, so shift makes the whole window draggable.
-        this.interactive = !ImGui.GetIO().KeyShift;
+        this.interactive = !ImGui.GetIO().KeyShift || this.config.LockPosition;
 
         var scale = Math.Clamp(this.config.Scale, 0.25f, 4f);
         ImGui.SetWindowFontScale(scale);
