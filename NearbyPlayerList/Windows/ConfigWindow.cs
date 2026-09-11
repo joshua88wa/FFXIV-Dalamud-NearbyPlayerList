@@ -100,6 +100,8 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
+        HelpMarker("Stops the list being dragged, including by accident with Shift. While locked, Shift does nothing to the list at all, so a Shift click that lands on it passes through to the game instead of being swallowed. Center player list and /npl center still work.");
+
         var showButtons = this.config.ShowWindowButtons;
         if (ImGui.Checkbox("Show window buttons", ref showButtons))
         {
