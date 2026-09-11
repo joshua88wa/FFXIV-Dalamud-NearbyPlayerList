@@ -21,6 +21,8 @@ public sealed class ListWindow : Window
     private bool showReadiness;
     private readonly Dictionary<uint, RaiseReadiness> readiness = new();
     private DateTime lastReadinessCheck = DateTime.MinValue;
+    private readonly HashSet<uint> seenDead = new();
+    private readonly List<uint> stale = new();
     private string visibilityReason = string.Empty;
     private bool centerRequested;
     private bool dragLatch;
@@ -443,31 +445,62 @@ public sealed class ListWindow : Window
 
     // Written only once the anchor has held still for a moment, so dragging does not
     // write the config file every frame.
-    // Only the dead are checked, and only four times a second: each check asks the game
-    // about every known raise action against that specific player.
+    // Only the dead are checked: each check asks the game about every known raise
+    // action against that specific player. A newly dead player is evaluated on the
+    // frame they appear rather than waiting for the next tick, because waiting is
+    // exactly when the label matters most.
     private void RefreshReadiness()
     {
         if (!this.showReadiness)
         {
-            this.readiness.Clear();
+            if (this.readiness.Count > 0)
+                this.readiness.Clear();
+
             return;
         }
 
+        var immediate = false;
+        foreach (var entry in this.entries)
+        {
+            if (entry.IsDead && !this.readiness.ContainsKey(entry.EntityId))
+            {
+                immediate = true;
+                break;
+            }
+        }
+
         var now = DateTime.UtcNow;
-        if ((now - this.lastReadinessCheck).TotalMilliseconds < 250)
+        if (!immediate && (now - this.lastReadinessCheck).TotalMilliseconds < 150)
             return;
 
         this.lastReadinessCheck = now;
-        this.readiness.Clear();
+
+        // Rebuilt in place rather than cleared and refilled, so an entry never blinks
+        // back to Dead for a frame while the new value is worked out.
+        this.seenDead.Clear();
 
         foreach (var entry in this.entries)
         {
             if (!entry.IsDead)
                 continue;
 
+            this.seenDead.Add(entry.EntityId);
             this.readiness[entry.EntityId] =
                 RaiseCaster.Evaluate(this.scanner.RaiseActionsForAvailability, entry.GameObject.GameObjectId, this.config);
         }
+
+        if (this.readiness.Count == this.seenDead.Count)
+            return;
+
+        this.stale.Clear();
+        foreach (var key in this.readiness.Keys)
+        {
+            if (!this.seenDead.Contains(key))
+                this.stale.Add(key);
+        }
+
+        foreach (var key in this.stale)
+            this.readiness.Remove(key);
     }
 
     private void PersistAnchor(Vector2 value)
@@ -499,6 +532,16 @@ public sealed class ListWindow : Window
 
         if ((DateTime.UtcNow - this.anchorChangedAt).TotalMilliseconds < 750)
             return;
+
+        // Logged so an unexplained move can be traced afterwards. The interesting
+        // part is usually whether Shift was held, since Shift makes the whole window
+        // grabbable and the game uses Shift for plenty of other things.
+        var io = ImGui.GetIO();
+        var viewport = ImGui.GetMainViewport();
+        Service.Log.Information(
+            $"[anchor] {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F0},{value.Y:F0} " +
+            $"shift={io.KeyShift} drag={this.dragLatch} size={ImGui.GetWindowSize().X:F0}x{ImGui.GetWindowSize().Y:F0} " +
+            $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
 
         this.config.AnchorX = value.X;
         this.config.AnchorY = value.Y;
