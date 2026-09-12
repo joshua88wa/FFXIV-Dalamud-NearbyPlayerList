@@ -113,20 +113,6 @@ public sealed class ListWindow : Window
         if (!this.ShouldAcceptInput())
             this.Flags |= ImGuiWindowFlags.NoInputs;
 
-        if (this.centerRequested)
-        {
-            var viewport = ImGui.GetMainViewport();
-            var center = viewport.Pos + (viewport.Size * 0.5f);
-            ImGui.SetNextWindowPos(center, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
-            this.anchor = null;
-            this.centerRequested = false;
-        }
-        else if (this.anchor.HasValue && !ImGui.GetIO().KeyShift)
-        {
-            // Skipped while shift is held; re-pinning every frame would cancel the drag.
-            ImGui.SetNextWindowPos(this.anchor.Value, ImGuiCond.Always, this.Pivot);
-        }
-
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(2, 2));
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(2, 2));
 
@@ -137,7 +123,25 @@ public sealed class ListWindow : Window
 
         // Sized explicitly rather than with AlwaysAutoResize, which fits the window to the
         // previous frame's content. That lag offsets any pinned corner except the top left.
-        ImGui.SetNextWindowSize(this.CalcWindowSize(), ImGuiCond.Always);
+        var size = this.CalcWindowSize();
+        ImGui.SetNextWindowSize(size, ImGuiCond.Always);
+
+        if (this.centerRequested)
+        {
+            var viewport = ImGui.GetMainViewport();
+            var center = viewport.Pos + (viewport.Size * 0.5f);
+            ImGui.SetNextWindowPos(center - (size * 0.5f), ImGuiCond.Always);
+            this.anchor = null;
+            this.centerRequested = false;
+        }
+        else if (this.anchor.HasValue && !ImGui.GetIO().KeyShift)
+        {
+            // The top left is worked out here rather than handed to ImGui as a pivot.
+            // ImGui applies a pivot against the size it already knows, which is last
+            // frame's, so on any frame the row count changed the pinned corner landed
+            // one row out and was then saved as the new anchor, walking the window.
+            ImGui.SetNextWindowPos(this.anchor.Value - (size * this.Pivot), ImGuiCond.Always);
+        }
     }
 
     private static Vector2 CalcBoxSize(float scale, float lineHeight)
