@@ -301,23 +301,20 @@ public sealed class PlayerScanner
 
     private bool PassesFilter(PlayerEntry entry)
     {
+        // Applies in every mode, including Show all. The setting is an explicit
+        // "hide these", so it would be odd for it to quietly not apply somewhere.
+        if (entry.IsDead && this.config.FilterIgnoreAlreadyRaised && entry.RaiseHandled)
+            return false;
+
         switch (this.effectiveFilter)
         {
             case FilterMode.BelowHealthThreshold:
                 if (entry.MaxHp == 0)
                     return false;
-                if (entry.HpFraction > this.config.HealthThreshold)
-                    return false;
-                if (entry.IsDead && this.config.FilterIgnoreAlreadyRaised && entry.RaiseHandled)
-                    return false;
-                return true;
+                return entry.HpFraction <= this.config.HealthThreshold;
 
             case FilterMode.DeadOnly:
-                if (!entry.IsDead)
-                    return false;
-                if (this.config.FilterIgnoreAlreadyRaised && entry.RaiseHandled)
-                    return false;
-                return true;
+                return entry.IsDead;
 
             case FilterMode.All:
             default:
@@ -330,8 +327,6 @@ public sealed class PlayerScanner
     private void ApplyRaiseFilters(List<PlayerEntry> list)
     {
         if (!this.config.FilterIgnoreAlreadyRaised)
-            return;
-        if (this.effectiveFilter == FilterMode.All)
             return;
 
         list.RemoveAll(e => e.IsDead && e.RaisedBy != null);

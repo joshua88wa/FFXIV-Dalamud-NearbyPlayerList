@@ -481,19 +481,16 @@ public sealed class ConfigWindow : Window
             dirty = true;
         }
 
-        if (this.config.Filter != FilterMode.All)
-        {
-            ImGui.Indent();
-            var ignoreRaised = this.config.FilterIgnoreAlreadyRaised;
-            if (ImGui.Checkbox("Ignore players who already have a raise incoming", ref ignoreRaised))
-            {
-                this.config.FilterIgnoreAlreadyRaised = ignoreRaised;
-                dirty = true;
-            }
+        ImGui.Separator();
 
-            ImGui.Unindent();
+        var ignoreRaised = this.config.FilterIgnoreAlreadyRaised;
+        if (ImGui.Checkbox("Hide players who already have a raise incoming", ref ignoreRaised))
+        {
+            this.config.FilterIgnoreAlreadyRaised = ignoreRaised;
+            dirty = true;
         }
 
+        HelpMarker("Drops dead players who already have the Raise status, or who someone is currently casting a raise on, so the list only shows people who still need one. Applies in every filter mode, including Show all players. Off by default, so a raised player stays visible and reads Raised.");
         ImGui.Separator();
 
         var hideSelf = this.config.HideSelf;

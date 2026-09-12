@@ -49,7 +49,7 @@ public static unsafe class RaiseCaster
 
         foreach (var id in raiseActions)
         {
-            if (manager->GetActionStatus(ActionType.Action, id, targetId) != 0)
+            if (manager->GetActionStatus(ActionType.Action, id, targetId, false, false) != 0)
                 continue;
 
             var row = sheet?.GetRowOrDefault(id);
@@ -159,7 +159,12 @@ public static unsafe class RaiseCaster
 
         foreach (var id in raiseActions)
         {
-            var status = manager->GetActionStatus(ActionType.Action, id, targetId);
+            // checkRecastActive and checkCastingActive are switched off. Otherwise a
+            // rolling global cooldown, or any cast in progress, makes every raise read
+            // as unusable, which in practice is most of the time in combat. The click
+            // queues the action anyway, so the question here is whether the raise is
+            // possible at all, not whether it could start this instant.
+            var status = manager->GetActionStatus(ActionType.Action, id, targetId, false, false);
 
             if (status == StatusNotEnoughMp)
             {
@@ -216,7 +221,7 @@ public static unsafe class RaiseCaster
         if (needsSwiftcast && config.UseSwiftcast && SwiftcastReady())
         {
             var self = Service.Objects.LocalPlayer;
-            manager->UseAction(ActionType.Action, SwiftcastAction, self?.GameObjectId ?? 0xE000_0000);
+            manager->UseAction(ActionType.Action, SwiftcastAction, self?.GameObjectId ?? 0xE000_0000, 0, ActionManager.UseActionMode.Queue);
 
             // The buff is not up in the same frame the button is pressed, so the raise
             // waits for Tick to see it land.
@@ -226,7 +231,7 @@ public static unsafe class RaiseCaster
             return true;
         }
 
-        manager->UseAction(ActionType.Action, action.Value, targetId);
+        manager->UseAction(ActionType.Action, action.Value, targetId, 0, ActionManager.UseActionMode.Queue);
         return true;
     }
 
@@ -246,7 +251,7 @@ public static unsafe class RaiseCaster
 
         var manager = ActionManager.Instance();
         if (manager != null)
-            manager->UseAction(ActionType.Action, pendingAction, pendingTarget);
+            manager->UseAction(ActionType.Action, pendingAction, pendingTarget, 0, ActionManager.UseActionMode.Queue);
 
         Clear();
     }

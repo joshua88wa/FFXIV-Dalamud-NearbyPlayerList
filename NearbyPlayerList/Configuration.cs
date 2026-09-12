@@ -59,7 +59,7 @@ public class Configuration : IPluginConfiguration
     // Filtering
     public FilterMode Filter = FilterMode.All;
     public float HealthThreshold = 0.75f;      // used by BelowHealthThreshold
-    public bool FilterIgnoreAlreadyRaised = true;
+    public bool FilterIgnoreAlreadyRaised = false;
     public bool HideSelf = false;
     public bool HideParty = false;
     public bool LimitDistance = false;
