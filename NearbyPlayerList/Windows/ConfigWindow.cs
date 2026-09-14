@@ -414,25 +414,10 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
-        ImGui.SetNextItemWidth(220);
-        var growH = (int)this.config.GrowHorizontally;
-        if (ImGui.Combo("Expand horizontally", ref growH, "To the right\0To the left\0"))
-        {
-            this.config.GrowHorizontally = (HorizontalGrowth)growH;
-            dirty = true;
-        }
+        ImGui.TextUnformatted("Anchor corner");
+        HelpMarker("The corner the list is pinned to. The first player sits in that corner and later ones fill away from it, so boxes you have learned the position of do not move when someone new shows up.");
 
-        ImGui.SetNextItemWidth(220);
-        var growV = (int)this.config.GrowVertically;
-        if (ImGui.Combo("Expand vertically", ref growV, "Downward\0Upward\0"))
-        {
-            this.config.GrowVertically = (VerticalGrowth)growV;
-            dirty = true;
-        }
-
-        HelpMarker(this.config.Orientation == ListOrientation.Vertical
-            ? "These pin one corner of the list; the first player sits in it and later ones fill away from it. Vertical lists add new columns, so the horizontal setting is the one that matters most."
-            : "These pin one corner of the list; the first player sits in it and later ones fill away from it. Horizontal lists add new rows, so the vertical setting is the one that matters most.");
+        dirty |= this.DrawAnchorPicker();
 
         ImGui.Separator();
 
@@ -444,6 +429,88 @@ public sealed class ConfigWindow : Window
         }
 
         HelpMarker("Changes the label written on top of each HP bar, from 75% to 12,345 / 16,000. The bar itself is unaffected, and dead players show their raise state either way.");
+
+        return dirty;
+    }
+
+    // A square with a radio button in each corner, rather than two dropdowns. The
+    // anchor corner is the real underlying setting; the horizontal and vertical
+    // growth values are just how it is stored.
+    private bool DrawAnchorPicker()
+    {
+        var dirty = false;
+
+        var lineHeight = ImGui.GetTextLineHeight();
+        var box = new Vector2(lineHeight * 9f, lineHeight * 6f);
+        var origin = ImGui.GetCursorScreenPos() + new Vector2(ImGui.GetStyle().IndentSpacing, 0f);
+
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRect(origin, origin + box, ImGui.GetColorU32(ImGuiCol.Border), 3f, ImDrawFlags.None, 1.5f);
+
+        var corners = new[]
+        {
+            (H: HorizontalGrowth.Right, V: VerticalGrowth.Down, Label: "Top left", Body: "Expands to the right and downward."),
+            (H: HorizontalGrowth.Left, V: VerticalGrowth.Down, Label: "Top right", Body: "Expands to the left and downward."),
+            (H: HorizontalGrowth.Right, V: VerticalGrowth.Up, Label: "Bottom left", Body: "Expands to the right and upward."),
+            (H: HorizontalGrowth.Left, V: VerticalGrowth.Up, Label: "Bottom right", Body: "Expands to the left and upward."),
+        };
+
+        var radius = ImGui.GetFrameHeight();
+        var inset = lineHeight * 0.35f;
+
+        for (var i = 0; i < corners.Length; i++)
+        {
+            var corner = corners[i];
+            var onRight = corner.H == HorizontalGrowth.Left;
+            var onBottom = corner.V == VerticalGrowth.Up;
+
+            var pos = origin + new Vector2(
+                onRight ? box.X - radius - inset : inset,
+                onBottom ? box.Y - radius - inset : inset);
+
+            ImGui.SetCursorScreenPos(pos);
+
+            var selected = this.config.GrowHorizontally == corner.H && this.config.GrowVertically == corner.V;
+            if (ImGui.RadioButton($"##npl_anchor{i}", selected))
+            {
+                this.config.GrowHorizontally = corner.H;
+                this.config.GrowVertically = corner.V;
+                dirty = true;
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.TextUnformatted(corner.Label);
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+                ImGui.TextUnformatted(corner.Body);
+                ImGui.PopStyleColor();
+                ImGui.EndTooltip();
+            }
+        }
+
+        // An arrow from the pinned corner toward the opposite one, so the direction is
+        // readable without hovering anything.
+        var from = origin + new Vector2(
+            this.config.GrowHorizontally == HorizontalGrowth.Left ? box.X - radius - inset : radius + inset,
+            this.config.GrowVertically == VerticalGrowth.Up ? box.Y - radius - inset : radius + inset);
+        var to = origin + new Vector2(
+            this.config.GrowHorizontally == HorizontalGrowth.Left ? inset * 2f : box.X - (inset * 2f),
+            this.config.GrowVertically == VerticalGrowth.Up ? inset * 2f : box.Y - (inset * 2f));
+
+        var accent = ImGui.GetColorU32(new Vector4(0.35f, 0.60f, 0.95f, 0.85f));
+        draw.AddLine(from, to, accent, 2f);
+
+        var back = Vector2.Normalize(from - to) * (lineHeight * 0.5f);
+        var side = new Vector2(-back.Y, back.X) * 0.45f;
+        draw.AddTriangleFilled(to, to + back + side, to + back - side, accent);
+
+        ImGui.SetCursorScreenPos(origin);
+        ImGui.Dummy(box);
+
+        TextHint(this.config.Orientation == ListOrientation.Vertical
+            ? "Vertical lists add new columns, so the left and right choice is the one that matters most."
+            : "Horizontal lists add new rows, so the up and down choice is the one that matters most.");
 
         return dirty;
     }
