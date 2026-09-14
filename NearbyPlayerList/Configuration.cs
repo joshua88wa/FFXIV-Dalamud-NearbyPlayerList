@@ -92,7 +92,7 @@ public class Configuration : IPluginConfiguration
     public bool ShowHpNumbers = false;
     public ClickAction LeftClick = ClickAction.HardTarget;
     public ClickAction RightClick = ClickAction.SoftTarget;
-    public ClickAction MiddleClick = ClickAction.None;
+    public ClickAction MiddleClick = ClickAction.FocusTarget;
     public ClickAction CtrlLeftClick = ClickAction.None;
     public ClickAction CtrlRightClick = ClickAction.None;
     public ClickAction AltLeftClick = ClickAction.None;

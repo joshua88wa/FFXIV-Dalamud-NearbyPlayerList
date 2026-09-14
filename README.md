@@ -25,6 +25,8 @@ interact with. For a full zone roster, use Wholist.
 - Your target, soft target, focus target and party members each get their own
   highlight color.
 - Clicking a box selects that player.
+- Optionally raise a dead player straight from their box, using Swiftcast when the
+  raise has a cast time.
 - Visibility rules, so the list can show or hide itself by zone type and by job.
 - Always disabled in PvP.
 - A small button strip pinned to the same corner the list grows away from: hide the
@@ -86,8 +88,10 @@ Open with `/npl config`, or from the plugin installer.
 
 - Direction: vertical or horizontal
 - Rows per column, or columns per row, default 8
-- Expand horizontally: to the right or to the left
-- Expand vertically: downward or upward
+- Anchor corner, picked from a square with a radio button in each corner. The list is
+  pinned to that corner and grows away from it, so the first player always sits there
+  and boxes do not shuffle when someone new walks into range. An arrow shows the
+  direction, and each corner names what it does on hover.
 
   These pin one corner of the list. The first player sits in that corner and the rest
   fill away from it, so boxes do not shuffle around when someone new walks into range.
@@ -98,7 +102,8 @@ Open with `/npl config`, or from the plugin installer.
 
 - Show all players, only players at or below a health threshold (75% by default), or
   only dead players
-- Ignore players who already have a raise incoming
+- Hide players who already have a raise incoming, off by default. Applies in every
+  filter mode, including show all.
 - Hide self
 - Hide party members
 - Limit by distance, 30 yalms by default
@@ -118,7 +123,12 @@ Open with `/npl config`, or from the plugin installer.
   to be turned off
 - Optionally blend the highlight color into the box background
 - Show when a player is being raised by someone else
-- Left and right click actions: target, soft target, focus target, or nothing
+- A click binding table: left, right and middle click, plus Ctrl and Alt with left and
+  right. Each picks an action of target, soft target, focus target or nothing, and has
+  its own Raise if dead checkbox. Focus target toggles, so clicking your current focus
+  clears it.
+- Use Swiftcast when the raise has a cast time
+- Show raise readiness instead of the Dead label
 
 ## Notes
 
@@ -134,6 +144,20 @@ draggable.
 on a corpse as a raise. That covers the six job raises plus duty variants like Occult
 Raise, Variant Raise and Phoenix Down, so Field Operation content keeps working when
 new ones are added.
+
+**Raising from the list** is off unless a click binding has Raise if dead ticked. That
+click targets the player, uses Swiftcast if the raise has a cast time and Swiftcast is
+up, then casts the raise once the instant cast lands. Swiftcast is skipped when an
+instant cast is already active, such as a Red Mage mid-Dualcast. Casts are queued the
+way the game queues a hotbar press, so clicking during the global cooldown works. If
+the player is alive, or your job has no raise, the click falls back to that binding's
+own action.
+
+**Raise readiness** replaces the Dead label with what would actually happen: Instant
+raise ready for no cast bar, Raise ready for a normal cast, or Not enough MP. Anyone
+out of range, or on a job with no raise, stays as Dead. Readiness is checked against
+that specific player, so range counts, and it ignores the global cooldown, since the
+click queues anyway.
 
 **Overlapping highlights** stack inward instead of replacing each other, so a party
 member who is also your target keeps both colors. Soft target draws outside hard
