@@ -62,6 +62,12 @@ public sealed class ListWindow : Window
         if (local == null)
             return false;
 
+        // Evaluated here rather than in PreDraw. Dalamud skips PreDraw entirely when
+        // this returns false, so deciding in PreDraw meant the first Blocked verdict
+        // was the last one: leaving a PvP zone could never bring the list back.
+        this.visibility = VisibilityResolver.Evaluate(this.config, this.scanner.RaiseActionsForAvailability, out var reason);
+        this.visibilityReason = reason;
+
         if (this.visibility == ListVisibility.Blocked)
             return false;
 
@@ -88,9 +94,6 @@ public sealed class ListWindow : Window
         RaiseCaster.Tick();
 
         this.showReadiness = this.config.ShowRaiseReady && this.config.AnyRaiseBinding();
-
-        this.visibility = VisibilityResolver.Evaluate(this.config, this.scanner.RaiseActionsForAvailability, out var reason);
-        this.visibilityReason = reason;
 
         // No point scanning while collapsed or suppressed by a rule.
         var scanning = this.config.ShowWindow && this.visibility == ListVisibility.Visible;
