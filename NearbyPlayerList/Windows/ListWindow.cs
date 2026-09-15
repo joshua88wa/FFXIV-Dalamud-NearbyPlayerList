@@ -34,6 +34,13 @@ public sealed class ListWindow : Window
     private DateTime anchorChangedAt = DateTime.MinValue;
     private bool anchorDirty;
     private Vector2 lastSeenAnchor;
+    private bool positionIsOurs;
+
+    // Pinning is suspended only while shift could actually move the window. Locked, it
+    // must keep pinning: otherwise the top left stays put while the list grows, the
+    // pinned corner drifts by the size change, and that drift gets saved as the new
+    // anchor.
+    private bool ShiftCanDrag() => ImGui.GetIO().KeyShift && !this.config.LockPosition;
 
     private Vector2 Pivot => new(
         this.config.GrowHorizontally == HorizontalGrowth.Left ? 1f : 0f,
@@ -136,14 +143,16 @@ public sealed class ListWindow : Window
             ImGui.SetNextWindowPos(center - (size * 0.5f), ImGuiCond.Always);
             this.anchor = null;
             this.centerRequested = false;
+            this.positionIsOurs = true;
         }
-        else if (this.anchor.HasValue && !ImGui.GetIO().KeyShift)
+        else if (this.anchor.HasValue && !this.ShiftCanDrag())
         {
             // The top left is worked out here rather than handed to ImGui as a pivot.
             // ImGui applies a pivot against the size it already knows, which is last
             // frame's, so on any frame the row count changed the pinned corner landed
             // one row out and was then saved as the new anchor, walking the window.
             ImGui.SetNextWindowPos(this.anchor.Value - (size * this.Pivot), ImGuiCond.Always);
+            this.positionIsOurs = true;
         }
     }
 
@@ -235,9 +244,16 @@ public sealed class ListWindow : Window
 
     public override void Draw()
     {
-        // Re-derive the pinned corner from where the window actually ended up.
-        this.anchor = ImGui.GetWindowPos() + (ImGui.GetWindowSize() * this.Pivot);
-        this.PersistAnchor(this.anchor.Value);
+        // Re-derive the pinned corner from where the window actually ended up, but only
+        // when the plugin placed it or the user is dragging it. Otherwise a frame where
+        // pinning was suspended would hand back a drifted corner and save it.
+        if (this.positionIsOurs || this.dragLatch)
+        {
+            this.anchor = ImGui.GetWindowPos() + (ImGui.GetWindowSize() * this.Pivot);
+            this.PersistAnchor(this.anchor.Value);
+        }
+
+        this.positionIsOurs = false;
 
         this.RefreshReadiness();
         this.hitRects.Clear();
