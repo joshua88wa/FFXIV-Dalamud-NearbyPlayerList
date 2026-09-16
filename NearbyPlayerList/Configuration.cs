@@ -88,6 +88,11 @@ public class Configuration : IPluginConfiguration
     public bool ShowRaiseReady = true;
     public ClickAction RaiseFallback = ClickAction.HardTarget;
 
+    // Debugging. All off by default; these exist to investigate problems, not for play.
+    public bool LogAnchorChanges = false;
+    public bool PingOnNewPlayer = false;
+    public int PingSoundEffect = 4;
+
     public bool ShowRaiseInProgress = true;
     public bool ShowHpNumbers = false;
     public ClickAction LeftClick = ClickAction.HardTarget;

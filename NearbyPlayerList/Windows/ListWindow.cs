@@ -23,6 +23,9 @@ public sealed class ListWindow : Window
     private DateTime lastReadinessCheck = DateTime.MinValue;
     private readonly HashSet<uint> seenDead = new();
     private readonly List<uint> stale = new();
+    private readonly HashSet<uint> knownPlayers = new();
+    private readonly HashSet<uint> seenPlayers = new();
+    private DateTime lastPing = DateTime.MinValue;
     private string visibilityReason = string.Empty;
     private bool centerRequested;
     private bool dragLatch;
@@ -101,6 +104,7 @@ public sealed class ListWindow : Window
         RaiseCaster.Tick();
 
         this.showReadiness = this.config.ShowRaiseReady && this.config.AnyRaiseBinding();
+        this.PingForNewPlayers();
 
         // No point scanning while collapsed or suppressed by a rule.
         var scanning = this.config.ShowWindow && this.visibility == ListVisibility.Visible;
@@ -475,6 +479,45 @@ public sealed class ListWindow : Window
     // action against that specific player. A newly dead player is evaluated on the
     // frame they appear rather than waiting for the next tick, because waiting is
     // exactly when the label matters most.
+    // Debug aid: a sound when someone new appears in the list. Rate limited, and silent
+    // on the first population after the list appears or you change zone, since every
+    // entry is new at that moment and it would be a burst of pings.
+    private void PingForNewPlayers()
+    {
+        if (!this.config.PingOnNewPlayer)
+        {
+            if (this.knownPlayers.Count > 0)
+                this.knownPlayers.Clear();
+
+            return;
+        }
+
+        var wasEmpty = this.knownPlayers.Count == 0;
+        var isNew = false;
+
+        this.seenPlayers.Clear();
+        foreach (var entry in this.entries)
+        {
+            this.seenPlayers.Add(entry.EntityId);
+            if (!this.knownPlayers.Contains(entry.EntityId))
+                isNew = true;
+        }
+
+        this.knownPlayers.Clear();
+        foreach (var id in this.seenPlayers)
+            this.knownPlayers.Add(id);
+
+        if (!isNew || wasEmpty)
+            return;
+
+        var now = DateTime.UtcNow;
+        if ((now - this.lastPing).TotalMilliseconds < 250)
+            return;
+
+        this.lastPing = now;
+        DebugTools.PlaySound(this.config.PingSoundEffect);
+    }
+
     private void RefreshReadiness()
     {
         if (!this.showReadiness)
@@ -562,12 +605,15 @@ public sealed class ListWindow : Window
         // Logged so an unexplained move can be traced afterwards. The interesting
         // part is usually whether Shift was held, since Shift makes the whole window
         // grabbable and the game uses Shift for plenty of other things.
-        var io = ImGui.GetIO();
-        var viewport = ImGui.GetMainViewport();
-        Service.Log.Information(
-            $"[anchor] {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F0},{value.Y:F0} " +
-            $"shift={io.KeyShift} drag={this.dragLatch} size={ImGui.GetWindowSize().X:F0}x{ImGui.GetWindowSize().Y:F0} " +
-            $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
+        if (this.config.LogAnchorChanges)
+        {
+            var io = ImGui.GetIO();
+            var viewport = ImGui.GetMainViewport();
+            Service.Log.Information(
+                $"[anchor] {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F0},{value.Y:F0} " +
+                $"shift={io.KeyShift} drag={this.dragLatch} size={ImGui.GetWindowSize().X:F0}x{ImGui.GetWindowSize().Y:F0} " +
+                $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
+        }
 
         this.config.AnchorX = value.X;
         this.config.AnchorY = value.Y;
