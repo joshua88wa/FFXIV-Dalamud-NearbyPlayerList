@@ -5,6 +5,7 @@ using System.Numerics;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
+using Lumina.Excel.Sheets;
 using LuminaAction = Lumina.Excel.Sheets.Action;
 
 namespace NearbyPlayerList;
@@ -244,11 +245,11 @@ public sealed class PlayerScanner
         try
         {
             var job = pc.ClassJob.ValueNullable;
-            return job == null ? RoleRankFor(0, 0) : RoleRankFor(job.Value.Role, job.Value.ClassJobCategory.RowId);
+            return job == null || job.Value.RowId == 0 ? UnknownRank : RoleRankFor(job.Value);
         }
         catch
         {
-            return RoleRankFor(0, 0);
+            return UnknownRank;
         }
     }
 
@@ -408,26 +409,28 @@ public sealed class PlayerScanner
         });
     }
 
-    // Crafter and gatherer ClassJobCategory rows. Both have Role 0, so the category is
-    // the only thing that tells them apart from each other and from unknown jobs.
+    // Crafter and gatherer ClassJobCategory rows. Both have Role 0.
     private const uint DiscipleOfTheHand = 33;
     private const uint DiscipleOfTheLand = 32;
 
-    // Tank, healer, then dps, matching the party list convention, followed by crafters
-    // and gatherers in the order the game lists them.
-    private static int RoleRankFor(byte role, uint category) => role switch
+    private const int GroupSize = 1000;
+    private const int UnknownRank = 3 * GroupSize;
+
+    // UIPriority is the game's own job order: tanks, healers, melee, physical ranged,
+    // casters, then crafters from 101 and gatherers from 201. It keeps each job together,
+    // separates physical ranged from casters, and places new jobs without a code change.
+    // Base classes sit directly after their job. Limited jobs are ranked inside their
+    // role by the game, so they are lifted into a group of their own after the casters.
+    private static int RoleRankFor(ClassJob job)
     {
-        1 => 0,   // tank
-        4 => 1,   // healer
-        2 => 2,   // melee dps
-        3 => 3,   // ranged dps
-        _ => category switch
-        {
-            DiscipleOfTheHand => 4,
-            DiscipleOfTheLand => 5,
-            _ => 6,
-        },
-    };
+        var category = job.ClassJobCategory.RowId;
+
+        var group = category is DiscipleOfTheHand or DiscipleOfTheLand ? 2
+            : job.IsLimitedJob ? 1
+            : 0;
+
+        return (group * GroupSize) + Math.Min((int)job.UIPriority, GroupSize - 1);
+    }
 }
 
 

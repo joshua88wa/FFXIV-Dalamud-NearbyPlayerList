@@ -110,8 +110,9 @@ Open with `/npl config`, or from the plugin installer.
 
 ### Sorting
 
-- By role (tank, healer, dps, then crafters and gatherers), alphabetically, or by
-  missing HP as a percentage of max HP
+- By role then job, alphabetically, or by missing HP as a percentage of max HP. Role
+  order follows the game's job list: tanks, healers, melee, physical ranged, casters,
+  limited jobs, crafters, then gatherers, with each job grouped together.
 - When sorting by missing HP, a tie-break of role or alphabetical, since players at
   the same percentage are common and would otherwise be in an arbitrary order
 - Party members at top, with an option to put yourself above the rest of them. You
