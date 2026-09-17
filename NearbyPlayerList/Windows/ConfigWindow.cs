@@ -609,7 +609,7 @@ public sealed class ConfigWindow : Window
         var dirty = false;
 
         var sort = (int)this.config.Sort;
-        if (ImGui.RadioButton("By role (tank, healer, dps)", ref sort, (int)SortMode.Role))
+        if (ImGui.RadioButton("By role (tank, healer, dps, crafter, gatherer)", ref sort, (int)SortMode.Role))
             dirty = true;
         if (ImGui.RadioButton("Alphabetically", ref sort, (int)SortMode.Alphabetical))
             dirty = true;

@@ -15,6 +15,7 @@ public sealed class PlayerEntry
     public string Name = string.Empty;
     public uint JobId;
     public byte Role;              // 0 other, 1 tank, 2 melee dps, 3 ranged dps, 4 healer
+    public int RoleRank;           // position in role sort order, see RoleRankFor
     public uint CurrentHp;
     public uint MaxHp;
     public bool IsDead;
@@ -175,6 +176,7 @@ public sealed class PlayerScanner
                     Name = name,
                     JobId = pc.ClassJob.RowId,
                     Role = SafeRole(pc),
+                    RoleRank = SafeRoleRank(pc),
                     CurrentHp = pc.CurrentHp,
                     MaxHp = pc.MaxHp,
                     IsDead = pc.CurrentHp == 0,
@@ -234,6 +236,19 @@ public sealed class PlayerScanner
         catch
         {
             return 0;
+        }
+    }
+
+    private static int SafeRoleRank(IPlayerCharacter pc)
+    {
+        try
+        {
+            var job = pc.ClassJob.ValueNullable;
+            return job == null ? RoleRankFor(0, 0) : RoleRankFor(job.Value.Role, job.Value.ClassJobCategory.RowId);
+        }
+        catch
+        {
+            return RoleRankFor(0, 0);
         }
     }
 
@@ -336,10 +351,8 @@ public sealed class PlayerScanner
     {
         if (this.config.MissingHpTieBreak == TieBreak.Role)
         {
-            var ra = RoleOrder(a.Role);
-            var rb = RoleOrder(b.Role);
-            if (ra != rb)
-                return ra.CompareTo(rb);
+            if (a.RoleRank != b.RoleRank)
+                return a.RoleRank.CompareTo(b.RoleRank);
         }
 
         return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
@@ -359,12 +372,9 @@ public sealed class PlayerScanner
                 var byHp = a.HpFraction.CompareTo(b.HpFraction);
                 return byHp != 0 ? byHp : this.TieBreakCompare(a, b);
             },
-            _ => (a, b) =>
-            {
-                var ra = RoleOrder(a.Role);
-                var rb = RoleOrder(b.Role);
-                return ra != rb ? ra.CompareTo(rb) : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
-            },
+            _ => (a, b) => a.RoleRank != b.RoleRank
+                ? a.RoleRank.CompareTo(b.RoleRank)
+                : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
         };
 
         list.Sort((a, b) =>
@@ -398,14 +408,25 @@ public sealed class PlayerScanner
         });
     }
 
-    // Tank, healer, then dps, matching the party list convention.
-    private static int RoleOrder(byte role) => role switch
+    // Crafter and gatherer ClassJobCategory rows. Both have Role 0, so the category is
+    // the only thing that tells them apart from each other and from unknown jobs.
+    private const uint DiscipleOfTheHand = 33;
+    private const uint DiscipleOfTheLand = 32;
+
+    // Tank, healer, then dps, matching the party list convention, followed by crafters
+    // and gatherers in the order the game lists them.
+    private static int RoleRankFor(byte role, uint category) => role switch
     {
         1 => 0,   // tank
         4 => 1,   // healer
         2 => 2,   // melee dps
         3 => 3,   // ranged dps
-        _ => 4,
+        _ => category switch
+        {
+            DiscipleOfTheHand => 4,
+            DiscipleOfTheLand => 5,
+            _ => 6,
+        },
     };
 }
 
