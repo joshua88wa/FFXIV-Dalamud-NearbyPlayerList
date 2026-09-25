@@ -759,6 +759,27 @@ public sealed class ConfigWindow : Window
         }
 
         HelpMarker("Replaces the Dead label with what would actually happen if you clicked. Instant raise ready means no cast bar, because the raise is instant, an instant cast is already up, or Swiftcast is available. Raise ready means a normal cast. Not enough MP means exactly that. Anyone out of range, or on a job with no raise, stays as Dead.");
+
+        ImGui.Spacing();
+        ImGui.TextUnformatted("Label colours");
+        HelpMarker("The text written on the HP bar of a dead player. Raised and Being raised default to colours that read as handled, so the one asking for a raise is the one that stands out. The shadow behind the text switches to light behind a dark colour, so a dark label stays legible on the bar.");
+
+        ImGui.Indent();
+        dirty |= DrawLabelColour("Dead", ref this.config.DeadLabelColor, "dead");
+
+        if (ready)
+        {
+            dirty |= DrawLabelColour("Raise ready", ref this.config.RaiseReadyLabelColor, "ready");
+            dirty |= DrawLabelColour("Instant raise ready", ref this.config.InstantRaiseReadyLabelColor, "instant");
+            dirty |= DrawLabelColour("Not enough MP", ref this.config.NoMpLabelColor, "nomp");
+        }
+
+        if (this.config.ShowRaiseInProgress)
+            dirty |= DrawLabelColour("Being raised by someone else", ref this.config.BeingRaisedLabelColor, "inprogress");
+
+        dirty |= DrawLabelColour("Raised", ref this.config.RaisedLabelColor, "raised");
+        ImGui.Unindent();
+
         ImGui.Separator();
 
         TextHint("Found a bug, or have an idea? Open an issue:");
@@ -900,6 +921,22 @@ public sealed class ConfigWindow : Window
         }
 
         return changed;
+    }
+
+    // Swatch first so the labels line up down the left edge of the text, the way the
+    // highlight rows read.
+    private static bool DrawLabelColour(string label, ref Vector4 colour, string id)
+    {
+        var dirty = ImGui.ColorEdit4(
+            $"##npl_label_{id}",
+            ref colour,
+            ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoLabel | ImGuiColorEditFlags.AlphaPreviewHalf);
+
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(label);
+
+        return dirty;
     }
 
     private static bool DrawHighlight(string label, ref bool enabled, ref Vector4 colour, string id)

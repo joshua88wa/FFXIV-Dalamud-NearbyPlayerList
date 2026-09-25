@@ -645,22 +645,31 @@ public sealed class ListWindow : Window
         }
 
         string label;
+        var labelColor = new Vector4(1f, 1f, 1f, 0.95f);
+
         if (entry.IsDead && this.config.ShowRaiseInProgress && entry.RaisedBy != null)
+        {
             label = $"Being raised by {entry.RaisedBy}";
+            labelColor = this.config.BeingRaisedLabelColor;
+        }
         else if (entry.IsDead && entry.AlreadyRaised)
+        {
             label = "Raised";
+            labelColor = this.config.RaisedLabelColor;
+        }
         else if (entry.IsDead)
         {
             label = "Dead";
+            labelColor = this.config.DeadLabelColor;
 
             if (this.showReadiness && this.readiness.TryGetValue(entry.EntityId, out var state))
             {
-                label = state switch
+                (label, labelColor) = state switch
                 {
-                    RaiseReadiness.InstantReady => "Instant raise ready",
-                    RaiseReadiness.Ready => "Raise ready",
-                    RaiseReadiness.NoMp => "Not enough MP",
-                    _ => "Dead",
+                    RaiseReadiness.InstantReady => ("Instant raise ready", this.config.InstantRaiseReadyLabelColor),
+                    RaiseReadiness.Ready => ("Raise ready", this.config.RaiseReadyLabelColor),
+                    RaiseReadiness.NoMp => ("Not enough MP", this.config.NoMpLabelColor),
+                    _ => ("Dead", this.config.DeadLabelColor),
                 };
             }
         }
@@ -673,9 +682,21 @@ public sealed class ListWindow : Window
         var barHeight = barMax.Y - barMin.Y;
         var pos = new Vector2(barMin.X + (3f * scale), barMin.Y + ((barHeight - textSize.Y) * 0.5f));
 
-        // Shadowed so the label stays readable over both the filled and empty bar.
-        draw.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.8f)), label);
-        draw.AddText(pos, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.95f)), label);
+        // Shadowed so the label stays readable over both the filled and empty bar. The
+        // shadow flips to light behind a dark label, which a configured colour can be.
+        // Black on near-black would leave the text with no edge at all.
+        draw.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(ShadowFor(labelColor)), label);
+        draw.AddText(pos, ImGui.GetColorU32(labelColor), label);
+    }
+
+    // Perceived brightness, the usual luma weights rather than a plain average: the eye
+    // reads green as far brighter than blue at the same value.
+    private static Vector4 ShadowFor(Vector4 color)
+    {
+        var luma = (0.299f * color.X) + (0.587f * color.Y) + (0.114f * color.Z);
+        return luma < 0.5f
+            ? new Vector4(1f, 1f, 1f, 0.55f)
+            : new Vector4(0f, 0f, 0f, 0.8f);
     }
 
     // Icons are drawn untinted. The 62100 set carries its own colour, and multiplying a

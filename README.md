@@ -125,6 +125,10 @@ Open with `/npl config`, or from the plugin installer.
   to be turned off
 - Optionally blend the highlight color into the box background
 - Show when a player is being raised by someone else
+- Label colours for the text on a dead player's HP bar, one per state: Dead, Raise
+  ready, Instant raise ready, Not enough MP, Being raised, and Raised. Raised defaults
+  to dark grey and Being raised to amber, so the players who still need a raise are the
+  ones that stand out. The shadow behind the text flips to light behind a dark colour.
 - A click binding table: left, right and middle click, plus Ctrl and Alt with left and
   right. Each picks an action of target, soft target, focus target or nothing, and has
   its own Raise if dead checkbox. Focus target toggles, so clicking your current focus
