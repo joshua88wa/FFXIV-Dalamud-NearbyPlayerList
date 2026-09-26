@@ -82,6 +82,8 @@ public sealed class ConfigWindow : Window
                 ImGui.EndTabItem();
             }
 
+            if (ImGui.BeginTabItem("Debug", this.TabFlags("Debug")))             {                 dirty |= this.DrawDebugTab();                 ImGui.EndTabItem();             }
+
             ImGui.EndTabBar();
         }
 
@@ -607,7 +609,7 @@ public sealed class ConfigWindow : Window
         var dirty = false;
 
         var sort = (int)this.config.Sort;
-        if (ImGui.RadioButton("By role (tank, healer, dps)", ref sort, (int)SortMode.Role))
+        if (ImGui.RadioButton("By role, then job", ref sort, (int)SortMode.Role))
             dirty = true;
         if (ImGui.RadioButton("Alphabetically", ref sort, (int)SortMode.Alphabetical))
             dirty = true;
@@ -757,6 +759,27 @@ public sealed class ConfigWindow : Window
         }
 
         HelpMarker("Replaces the Dead label with what would actually happen if you clicked. Instant raise ready means no cast bar, because the raise is instant, an instant cast is already up, or Swiftcast is available. Raise ready means a normal cast. Not enough MP means exactly that. Anyone out of range, or on a job with no raise, stays as Dead.");
+
+        ImGui.Spacing();
+        ImGui.TextUnformatted("Label colours");
+        HelpMarker("The text written on the HP bar of a dead player. Raised and Being raised default to colours that read as handled, so the one asking for a raise is the one that stands out. The shadow behind the text switches to light behind a dark colour, so a dark label stays legible on the bar.");
+
+        ImGui.Indent();
+        dirty |= DrawLabelColour("Dead", ref this.config.DeadLabelColor, "dead");
+
+        if (ready)
+        {
+            dirty |= DrawLabelColour("Raise ready", ref this.config.RaiseReadyLabelColor, "ready");
+            dirty |= DrawLabelColour("Instant raise ready", ref this.config.InstantRaiseReadyLabelColor, "instant");
+            dirty |= DrawLabelColour("Not enough MP", ref this.config.NoMpLabelColor, "nomp");
+        }
+
+        if (this.config.ShowRaiseInProgress)
+            dirty |= DrawLabelColour("Being raised by someone else", ref this.config.BeingRaisedLabelColor, "inprogress");
+
+        dirty |= DrawLabelColour("Raised", ref this.config.RaisedLabelColor, "raised");
+        ImGui.Unindent();
+
         ImGui.Separator();
 
         TextHint("Found a bug, or have an idea? Open an issue:");
@@ -797,6 +820,79 @@ public sealed class ConfigWindow : Window
         ImGui.PopStyleColor();
     }
 
+    // Set by the plugin so the raise dump can reach the scanner, which this window
+    // has no reason to hold otherwise.
+    public Action? DumpRaiseStatus { get; set; }
+
+    private bool DrawDebugTab()
+    {
+        var dirty = false;
+
+        TextHint("Tools for investigating problems. Everything here is off by default and none of it changes how the list behaves.");
+        ImGui.Separator();
+
+        if (ImGui.Button("Dump raise status"))
+            this.DumpRaiseStatus?.Invoke();
+
+        HelpMarker("Writes what the game says about every raise action your job could use: whether it is available, which job it belongs to, and the status code if not. A summary goes to your own chat log and the full detail to the Dalamud log. Same as typing /npl raisedebug.");
+
+        ImGui.Spacing();
+
+        var logAnchor = this.config.LogAnchorChanges;
+        if (ImGui.Checkbox("Log list position changes", ref logAnchor))
+        {
+            this.config.LogAnchorChanges = logAnchor;
+            dirty = true;
+        }
+
+        HelpMarker("Writes a line to the Dalamud log every time the pinned corner is saved, recording the old and new position, whether Shift was held, whether a drag was in progress, and the window and viewport sizes. Turn this on if the list ever moves on its own, then send the lines.");
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Open the log folder"))
+            DebugTools.OpenLogFolder();
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy log path"))
+            ImGui.SetClipboardText(DebugTools.LogPath);
+
+        TextHint(DebugTools.LogPath);
+
+        ImGui.Separator();
+
+        var ping = this.config.PingOnNewPlayer;
+        if (ImGui.Checkbox("Play a sound when someone joins the list", ref ping))
+        {
+            this.config.PingOnNewPlayer = ping;
+            dirty = true;
+        }
+
+        HelpMarker("Off by default, and genuinely annoying in a crowd. It is here so you can tell the list noticed someone without watching it. Silent on the first population after the list appears or you change zone, since everyone is new at that moment, and limited to one sound every quarter second.");
+
+        if (ping)
+        {
+            ImGui.Indent();
+
+            ImGui.SetNextItemWidth(160);
+            var sound = this.config.PingSoundEffect;
+            if (ImGui.InputInt("Sound effect", ref sound, 1, 1))
+            {
+                this.config.PingSoundEffect = Math.Clamp(sound, DebugTools.MinSound, DebugTools.MaxSound);
+                dirty = true;
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Test"))
+                DebugTools.PlaySound(this.config.PingSoundEffect);
+
+            HelpMarker("The game's own chat sound effects, the ones <se.1> to <se.16> play, so your in game sound settings still apply. Step through them with Test to find one you like.");
+
+            ImGui.Unindent();
+        }
+
+        return dirty;
+    }
+
     private bool DrawBinding(string label, ref ClickAction action, ref bool raiseFirst)
     {
         var changed = false;
@@ -825,6 +921,22 @@ public sealed class ConfigWindow : Window
         }
 
         return changed;
+    }
+
+    // Swatch first so the labels line up down the left edge of the text, the way the
+    // highlight rows read.
+    private static bool DrawLabelColour(string label, ref Vector4 colour, string id)
+    {
+        var dirty = ImGui.ColorEdit4(
+            $"##npl_label_{id}",
+            ref colour,
+            ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoLabel | ImGuiColorEditFlags.AlphaPreviewHalf);
+
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(label);
+
+        return dirty;
     }
 
     private static bool DrawHighlight(string label, ref bool enabled, ref Vector4 colour, string id)

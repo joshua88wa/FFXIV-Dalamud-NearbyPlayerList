@@ -29,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
         this.listWindow = new ListWindow(this.config, scanner) { IsOpen = this.config.ShowWindow };
         this.configWindow = new ConfigWindow(this.config, this.listWindow);
         this.listWindow.OpenConfig = tab => this.configWindow.RequestTab(tab);
+        this.configWindow.DumpRaiseStatus = () => VisibilityResolver.DumpRaiseStatus(this.scanner.RaiseActionsForAvailability);
 
         this.windowSystem.AddWindow(this.listWindow);
         this.windowSystem.AddWindow(this.configWindow);

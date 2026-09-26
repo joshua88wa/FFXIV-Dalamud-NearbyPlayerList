@@ -88,7 +88,23 @@ public class Configuration : IPluginConfiguration
     public bool ShowRaiseReady = true;
     public ClickAction RaiseFallback = ClickAction.HardTarget;
 
+    // Debugging. All off by default; these exist to investigate problems, not for play.
+    public bool LogAnchorChanges = false;
+    public bool PingOnNewPlayer = false;
+    public int PingSoundEffect = 4;
+
     public bool ShowRaiseInProgress = true;
+
+    // HP bar label colours, one per state a dead player can be in. Split out so the
+    // states that need nothing from you read differently mid-fight from the one that
+    // wants a raise. The shadow behind the label follows the colour's brightness, so a
+    // dark colour stays legible on the bar.
+    public Vector4 DeadLabelColor = new(1f, 1f, 1f, 0.95f);
+    public Vector4 RaiseReadyLabelColor = new(1f, 1f, 1f, 0.95f);
+    public Vector4 InstantRaiseReadyLabelColor = new(1f, 1f, 1f, 0.95f);
+    public Vector4 NoMpLabelColor = new(1f, 1f, 1f, 0.95f);
+    public Vector4 BeingRaisedLabelColor = new(1.00f, 0.82f, 0.25f, 0.95f);   // amber
+    public Vector4 RaisedLabelColor = new(0.35f, 0.35f, 0.35f, 0.95f);        // dark grey
     public bool ShowHpNumbers = false;
     public ClickAction LeftClick = ClickAction.HardTarget;
     public ClickAction RightClick = ClickAction.SoftTarget;

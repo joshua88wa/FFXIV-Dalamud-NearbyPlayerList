@@ -23,6 +23,9 @@ public sealed class ListWindow : Window
     private DateTime lastReadinessCheck = DateTime.MinValue;
     private readonly HashSet<uint> seenDead = new();
     private readonly List<uint> stale = new();
+    private readonly HashSet<uint> knownPlayers = new();
+    private readonly HashSet<uint> seenPlayers = new();
+    private DateTime lastPing = DateTime.MinValue;
     private string visibilityReason = string.Empty;
     private bool centerRequested;
     private bool dragLatch;
@@ -101,6 +104,7 @@ public sealed class ListWindow : Window
         RaiseCaster.Tick();
 
         this.showReadiness = this.config.ShowRaiseReady && this.config.AnyRaiseBinding();
+        this.PingForNewPlayers();
 
         // No point scanning while collapsed or suppressed by a rule.
         var scanning = this.config.ShowWindow && this.visibility == ListVisibility.Visible;
@@ -475,6 +479,45 @@ public sealed class ListWindow : Window
     // action against that specific player. A newly dead player is evaluated on the
     // frame they appear rather than waiting for the next tick, because waiting is
     // exactly when the label matters most.
+    // Debug aid: a sound when someone new appears in the list. Rate limited, and silent
+    // on the first population after the list appears or you change zone, since every
+    // entry is new at that moment and it would be a burst of pings.
+    private void PingForNewPlayers()
+    {
+        if (!this.config.PingOnNewPlayer)
+        {
+            if (this.knownPlayers.Count > 0)
+                this.knownPlayers.Clear();
+
+            return;
+        }
+
+        var wasEmpty = this.knownPlayers.Count == 0;
+        var isNew = false;
+
+        this.seenPlayers.Clear();
+        foreach (var entry in this.entries)
+        {
+            this.seenPlayers.Add(entry.EntityId);
+            if (!this.knownPlayers.Contains(entry.EntityId))
+                isNew = true;
+        }
+
+        this.knownPlayers.Clear();
+        foreach (var id in this.seenPlayers)
+            this.knownPlayers.Add(id);
+
+        if (!isNew || wasEmpty)
+            return;
+
+        var now = DateTime.UtcNow;
+        if ((now - this.lastPing).TotalMilliseconds < 250)
+            return;
+
+        this.lastPing = now;
+        DebugTools.PlaySound(this.config.PingSoundEffect);
+    }
+
     private void RefreshReadiness()
     {
         if (!this.showReadiness)
@@ -562,12 +605,15 @@ public sealed class ListWindow : Window
         // Logged so an unexplained move can be traced afterwards. The interesting
         // part is usually whether Shift was held, since Shift makes the whole window
         // grabbable and the game uses Shift for plenty of other things.
-        var io = ImGui.GetIO();
-        var viewport = ImGui.GetMainViewport();
-        Service.Log.Information(
-            $"[anchor] {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F0},{value.Y:F0} " +
-            $"shift={io.KeyShift} drag={this.dragLatch} size={ImGui.GetWindowSize().X:F0}x{ImGui.GetWindowSize().Y:F0} " +
-            $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
+        if (this.config.LogAnchorChanges)
+        {
+            var io = ImGui.GetIO();
+            var viewport = ImGui.GetMainViewport();
+            Service.Log.Information(
+                $"[anchor] {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F0},{value.Y:F0} " +
+                $"shift={io.KeyShift} drag={this.dragLatch} size={ImGui.GetWindowSize().X:F0}x{ImGui.GetWindowSize().Y:F0} " +
+                $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
+        }
 
         this.config.AnchorX = value.X;
         this.config.AnchorY = value.Y;
@@ -599,22 +645,31 @@ public sealed class ListWindow : Window
         }
 
         string label;
+        var labelColor = new Vector4(1f, 1f, 1f, 0.95f);
+
         if (entry.IsDead && this.config.ShowRaiseInProgress && entry.RaisedBy != null)
+        {
             label = $"Being raised by {entry.RaisedBy}";
+            labelColor = this.config.BeingRaisedLabelColor;
+        }
         else if (entry.IsDead && entry.AlreadyRaised)
+        {
             label = "Raised";
+            labelColor = this.config.RaisedLabelColor;
+        }
         else if (entry.IsDead)
         {
             label = "Dead";
+            labelColor = this.config.DeadLabelColor;
 
             if (this.showReadiness && this.readiness.TryGetValue(entry.EntityId, out var state))
             {
-                label = state switch
+                (label, labelColor) = state switch
                 {
-                    RaiseReadiness.InstantReady => "Instant raise ready",
-                    RaiseReadiness.Ready => "Raise ready",
-                    RaiseReadiness.NoMp => "Not enough MP",
-                    _ => "Dead",
+                    RaiseReadiness.InstantReady => ("Instant raise ready", this.config.InstantRaiseReadyLabelColor),
+                    RaiseReadiness.Ready => ("Raise ready", this.config.RaiseReadyLabelColor),
+                    RaiseReadiness.NoMp => ("Not enough MP", this.config.NoMpLabelColor),
+                    _ => ("Dead", this.config.DeadLabelColor),
                 };
             }
         }
@@ -627,9 +682,21 @@ public sealed class ListWindow : Window
         var barHeight = barMax.Y - barMin.Y;
         var pos = new Vector2(barMin.X + (3f * scale), barMin.Y + ((barHeight - textSize.Y) * 0.5f));
 
-        // Shadowed so the label stays readable over both the filled and empty bar.
-        draw.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.8f)), label);
-        draw.AddText(pos, ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.95f)), label);
+        // Shadowed so the label stays readable over both the filled and empty bar. The
+        // shadow flips to light behind a dark label, which a configured colour can be.
+        // Black on near-black would leave the text with no edge at all.
+        draw.AddText(pos + new Vector2(1f, 1f), ImGui.GetColorU32(ShadowFor(labelColor)), label);
+        draw.AddText(pos, ImGui.GetColorU32(labelColor), label);
+    }
+
+    // Perceived brightness, the usual luma weights rather than a plain average: the eye
+    // reads green as far brighter than blue at the same value.
+    private static Vector4 ShadowFor(Vector4 color)
+    {
+        var luma = (0.299f * color.X) + (0.587f * color.Y) + (0.114f * color.Z);
+        return luma < 0.5f
+            ? new Vector4(1f, 1f, 1f, 0.55f)
+            : new Vector4(0f, 0f, 0f, 0.8f);
     }
 
     // Icons are drawn untinted. The 62100 set carries its own colour, and multiplying a

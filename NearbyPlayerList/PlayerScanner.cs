@@ -5,6 +5,7 @@ using System.Numerics;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
+using Lumina.Excel.Sheets;
 using LuminaAction = Lumina.Excel.Sheets.Action;
 
 namespace NearbyPlayerList;
@@ -15,6 +16,7 @@ public sealed class PlayerEntry
     public string Name = string.Empty;
     public uint JobId;
     public byte Role;              // 0 other, 1 tank, 2 melee dps, 3 ranged dps, 4 healer
+    public int RoleRank;           // position in role sort order, see RoleRankFor
     public uint CurrentHp;
     public uint MaxHp;
     public bool IsDead;
@@ -175,6 +177,7 @@ public sealed class PlayerScanner
                     Name = name,
                     JobId = pc.ClassJob.RowId,
                     Role = SafeRole(pc),
+                    RoleRank = SafeRoleRank(pc),
                     CurrentHp = pc.CurrentHp,
                     MaxHp = pc.MaxHp,
                     IsDead = pc.CurrentHp == 0,
@@ -234,6 +237,19 @@ public sealed class PlayerScanner
         catch
         {
             return 0;
+        }
+    }
+
+    private static int SafeRoleRank(IPlayerCharacter pc)
+    {
+        try
+        {
+            var job = pc.ClassJob.ValueNullable;
+            return job == null || job.Value.RowId == 0 ? UnknownRank : RoleRankFor(job.Value);
+        }
+        catch
+        {
+            return UnknownRank;
         }
     }
 
@@ -336,10 +352,8 @@ public sealed class PlayerScanner
     {
         if (this.config.MissingHpTieBreak == TieBreak.Role)
         {
-            var ra = RoleOrder(a.Role);
-            var rb = RoleOrder(b.Role);
-            if (ra != rb)
-                return ra.CompareTo(rb);
+            if (a.RoleRank != b.RoleRank)
+                return a.RoleRank.CompareTo(b.RoleRank);
         }
 
         return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
@@ -359,12 +373,9 @@ public sealed class PlayerScanner
                 var byHp = a.HpFraction.CompareTo(b.HpFraction);
                 return byHp != 0 ? byHp : this.TieBreakCompare(a, b);
             },
-            _ => (a, b) =>
-            {
-                var ra = RoleOrder(a.Role);
-                var rb = RoleOrder(b.Role);
-                return ra != rb ? ra.CompareTo(rb) : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
-            },
+            _ => (a, b) => a.RoleRank != b.RoleRank
+                ? a.RoleRank.CompareTo(b.RoleRank)
+                : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
         };
 
         list.Sort((a, b) =>
@@ -398,15 +409,28 @@ public sealed class PlayerScanner
         });
     }
 
-    // Tank, healer, then dps, matching the party list convention.
-    private static int RoleOrder(byte role) => role switch
+    // Crafter and gatherer ClassJobCategory rows. Both have Role 0.
+    private const uint DiscipleOfTheHand = 33;
+    private const uint DiscipleOfTheLand = 32;
+
+    private const int GroupSize = 1000;
+    private const int UnknownRank = 3 * GroupSize;
+
+    // UIPriority is the game's own job order: tanks, healers, melee, physical ranged,
+    // casters, then crafters from 101 and gatherers from 201. It keeps each job together,
+    // separates physical ranged from casters, and places new jobs without a code change.
+    // Base classes sit directly after their job. Limited jobs are ranked inside their
+    // role by the game, so they are lifted into a group of their own after the casters.
+    private static int RoleRankFor(ClassJob job)
     {
-        1 => 0,   // tank
-        4 => 1,   // healer
-        2 => 2,   // melee dps
-        3 => 3,   // ranged dps
-        _ => 4,
-    };
+        var category = job.ClassJobCategory.RowId;
+
+        var group = category is DiscipleOfTheHand or DiscipleOfTheLand ? 2
+            : job.IsLimitedJob ? 1
+            : 0;
+
+        return (group * GroupSize) + Math.Min((int)job.UIPriority, GroupSize - 1);
+    }
 }
 
 
