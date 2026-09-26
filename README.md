@@ -125,16 +125,34 @@ Open with `/npl config`, or from the plugin installer.
   to be turned off
 - Optionally blend the highlight color into the box background
 - Show when a player is being raised by someone else
-- Label colours for the text on a dead player's HP bar, one per state: Dead, Raise
+- Label colors for the text on a dead player's HP bar, one per state: Dead, Raise
   ready, Instant raise ready, Not enough MP, Being raised, and Raised. Raised defaults
-  to dark grey and Being raised to amber, so the players who still need a raise are the
-  ones that stand out. The shadow behind the text flips to light behind a dark colour.
+  to dark gray and Being raised to amber, so the players who still need a raise are the
+  ones that stand out. The shadow behind the text flips to light behind a dark color.
 - A click binding table: left, right and middle click, plus Ctrl and Alt with left and
   right. Each picks an action of target, soft target, focus target or nothing, and has
   its own Raise if dead checkbox. Focus target toggles, so clicking your current focus
   clears it.
 - Use Swiftcast when the raise has a cast time
 - Show raise readiness instead of the Dead label
+
+### Debug
+
+Tools for investigating problems. Everything here is off by default and none of it
+changes how the list behaves.
+
+- Dump raise status, which writes what the game says about every raise action your job
+  could use: whether it is available, which job it belongs to, and the status code if
+  not. A summary goes to your own chat log and the full detail to the Dalamud log. The
+  command `/npl raisedebug` does the same thing.
+- Log list position changes, which writes a line every time the pinned corner is saved,
+  recording the old and new position, whether Shift was held, whether a drag was in
+  progress, and the window and viewport sizes. Turn this on if the list ever moves on
+  its own, then send the lines.
+- Open the log folder, or copy its path
+- Play a sound when someone joins the list. Off by default, and genuinely annoying in a
+  crowd. It is silent on the first population after the list appears or you change zone,
+  since everyone is new at that moment, and limited to one sound every quarter second.
 
 ## Notes
 
