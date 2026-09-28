@@ -30,6 +30,13 @@ public sealed class PlayerEntry
     public float Distance;
     public IGameObject GameObject = null!;
 
+    // A slot held open for a player who left while the list was frozen under the cursor.
+    // It carries no data and has no GameObject, so every consumer has to skip it.
+    public bool IsPlaceholder;
+
+    public static PlayerEntry Placeholder(uint entityId)
+        => new() { EntityId = entityId, IsPlaceholder = true };
+
     public float HpFraction => this.MaxHp == 0 ? 0f : (float)this.CurrentHp / this.MaxHp;
     public uint MissingHp => this.MaxHp > this.CurrentHp ? this.MaxHp - this.CurrentHp : 0;
     public bool RaiseHandled => this.AlreadyRaised || this.RaisedBy != null;

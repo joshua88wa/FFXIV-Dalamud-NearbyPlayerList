@@ -782,6 +782,32 @@ public sealed class ConfigWindow : Window
 
         ImGui.Separator();
 
+        var freeze = this.config.FreezeWhileHovering;
+        if (ImGui.Checkbox("Hold the order still while the mouse is over the list", ref freeze))
+        {
+            this.config.FreezeWhileHovering = freeze;
+            dirty = true;
+        }
+
+        HelpMarker("Stops boxes moving out from under the pointer, so a click lands on the player you aimed at rather than whoever the list just sorted into that slot. HP bars and raise labels keep updating either way; only the positions are pinned. Someone who leaves holds an empty slot until you move off, and someone who dies is not promoted to the top until then either.");
+
+        if (freeze)
+        {
+            ImGui.Indent();
+            var grace = this.config.FreezeGraceMs;
+            ImGui.SetNextItemWidth(160);
+            if (ImGui.InputInt("Hold for (ms) after leaving", ref grace, 50, 100))
+            {
+                this.config.FreezeGraceMs = Math.Clamp(grace, 0, 2000);
+                dirty = true;
+            }
+
+            HelpMarker("Keeps the order still for a moment after the pointer leaves, so it does not snap while you are on your way off the last box. Set it to 0 to release the moment you leave.");
+            ImGui.Unindent();
+        }
+
+        ImGui.Separator();
+
         TextHint("Found a bug, or have an idea? Open an issue:");
 
         if (ImGui.Button("Open the issue tracker"))
