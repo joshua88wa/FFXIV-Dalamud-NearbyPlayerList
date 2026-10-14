@@ -95,6 +95,12 @@ public class Configuration : IPluginConfiguration
 
     public bool ShowRaiseInProgress = true;
 
+    // Holding the order still under the cursor. Live data keeps updating; only the
+    // positions are pinned, so a click lands on the player who was under the pointer
+    // when you decided to click rather than whoever moved into that slot since.
+    public bool FreezeWhileHovering = true;
+    public int FreezeGraceMs = 200;
+
     // HP bar label colours, one per state a dead player can be in. Split out so the
     // states that need nothing from you read differently mid-fight from the one that
     // wants a raise. The shadow behind the label follows the colour's brightness, so a

@@ -135,6 +135,8 @@ Open with `/npl config`, or from the plugin installer.
   clears it.
 - Use Swiftcast when the raise has a cast time
 - Show raise readiness instead of the Dead label
+- Hold the order still while the mouse is over the list, with a configurable hold of
+  200 ms by default after the pointer leaves
 
 ### Debug
 
@@ -207,6 +209,13 @@ HP and one-click targeting, which in PvP is an enemy list with a target assist.
 **A zone filter override does not overwrite your saved filter mode.** Clicking a filter
 button while a zone rule is in force wins until you leave the zone, then the rule takes
 over again.
+
+**Holding the order still** pins positions only. Every box is drawn from the live
+player every frame, so HP, dead state and raise labels stay current; the list simply
+does not re-sort while the pointer is on it. A player who leaves holds an empty slot,
+because closing the gap would pull everyone below them up by one, which is the thing
+that makes you click the wrong person. The cost is that sorting rules which promote
+someone, dead at top in particular, wait until you move off.
 
 **Party detection** uses the party list. Alliance members are not treated as party.
 

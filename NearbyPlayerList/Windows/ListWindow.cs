@@ -17,6 +17,12 @@ public sealed class ListWindow : Window
     private readonly List<(Vector2 Min, Vector2 Max)> hitRects = new();
     private List<PlayerEntry> entries = new();
 
+    // Entity ids in the order they were drawn when the cursor arrived. Positions are
+    // replayed from this while the cursor stays, so nothing slides under the pointer.
+    private readonly List<uint> frozenOrder = new();
+    private bool freezeActive;
+    private DateTime lastHoverAt = DateTime.MinValue;
+
     private ListVisibility visibility = ListVisibility.Visible;
     private bool showReadiness;
     private readonly Dictionary<uint, RaiseReadiness> readiness = new();
@@ -108,7 +114,7 @@ public sealed class ListWindow : Window
 
         // No point scanning while collapsed or suppressed by a rule.
         var scanning = this.config.ShowWindow && this.visibility == ListVisibility.Visible;
-        this.entries = scanning ? this.scanner.Scan() : new List<PlayerEntry>();
+        this.entries = scanning ? this.ApplyFreeze(this.scanner.Scan()) : new List<PlayerEntry>();
 
         this.Flags = ImGuiWindowFlags.NoTitleBar
                      | ImGuiWindowFlags.NoScrollbar
@@ -235,7 +241,14 @@ public sealed class ListWindow : Window
             return true;
         }
 
-        var mouse = io.MousePos;
+        return this.CursorOverList();
+    }
+
+    // Tested against last frame's rectangles, which is what PreDraw has to work with:
+    // this frame's boxes do not exist until Draw has run.
+    private bool CursorOverList()
+    {
+        var mouse = ImGui.GetIO().MousePos;
         foreach (var rect in this.hitRects)
         {
             if (mouse.X >= rect.Min.X && mouse.X <= rect.Max.X &&
@@ -244,6 +257,77 @@ public sealed class ListWindow : Window
         }
 
         return false;
+    }
+
+    // Replays the order the list had when the cursor arrived. Only positions are held:
+    // HP, dead state and raise labels are drawn from the live entry every frame, so a
+    // frozen list is never stale, just still. Sorting rules that would promote someone,
+    // dead at top in particular, do not apply until the cursor leaves.
+    private List<PlayerEntry> ApplyFreeze(List<PlayerEntry> live)
+    {
+        if (!this.config.FreezeWhileHovering)
+        {
+            this.freezeActive = false;
+            this.frozenOrder.Clear();
+            return live;
+        }
+
+        var now = DateTime.UtcNow;
+        if (this.CursorOverList())
+            this.lastHoverAt = now;
+
+        // A short grace period after the cursor leaves, so the order does not snap while
+        // you are still moving off the last box.
+        var grace = Math.Clamp(this.config.FreezeGraceMs, 0, 2000);
+        if ((now - this.lastHoverAt).TotalMilliseconds > grace)
+        {
+            this.freezeActive = false;
+            this.frozenOrder.Clear();
+            return live;
+        }
+
+        if (!this.freezeActive)
+        {
+            this.freezeActive = true;
+            this.frozenOrder.Clear();
+            foreach (var entry in live)
+                this.frozenOrder.Add(entry.EntityId);
+        }
+
+        var byId = new Dictionary<uint, PlayerEntry>(live.Count);
+        foreach (var entry in live)
+            byId[entry.EntityId] = entry;
+
+        var ordered = new List<PlayerEntry>(live.Count);
+        foreach (var id in this.frozenOrder)
+        {
+            // Someone who left holds their slot as an empty box. Closing the gap would
+            // pull every player below them up by one, which is the whole problem.
+            if (byId.TryGetValue(id, out var entry))
+            {
+                ordered.Add(entry);
+                byId.Remove(id);
+            }
+            else
+            {
+                ordered.Add(PlayerEntry.Placeholder(id));
+            }
+        }
+
+        // Anyone who arrived while frozen goes on the end rather than into the middle.
+        foreach (var entry in live)
+        {
+            if (!byId.Remove(entry.EntityId))
+                continue;
+
+            ordered.Add(entry);
+            this.frozenOrder.Add(entry.EntityId);
+        }
+
+        if (this.config.MaxPlayers > 0 && ordered.Count > this.config.MaxPlayers)
+            ordered.RemoveRange(this.config.MaxPlayers, ordered.Count - this.config.MaxPlayers);
+
+        return ordered;
     }
 
     public override void Draw()
@@ -342,6 +426,15 @@ public sealed class ListWindow : Window
 
     private void DrawEntry(PlayerEntry entry, Vector2 boxSize, float scale)
     {
+        // A held slot draws nothing but still counts as part of the list, so the cursor
+        // sitting in the gap keeps the freeze alive instead of releasing it.
+        if (entry.IsPlaceholder)
+        {
+            ImGui.Dummy(boxSize);
+            this.hitRects.Add((ImGui.GetItemRectMin(), ImGui.GetItemRectMax()));
+            return;
+        }
+
         if (this.interactive)
             ImGui.InvisibleButton($"##npl_{entry.EntityId}", boxSize);
         else
@@ -498,6 +591,9 @@ public sealed class ListWindow : Window
         this.seenPlayers.Clear();
         foreach (var entry in this.entries)
         {
+            if (entry.IsPlaceholder)
+                continue;
+
             this.seenPlayers.Add(entry.EntityId);
             if (!this.knownPlayers.Contains(entry.EntityId))
                 isNew = true;
@@ -531,6 +627,9 @@ public sealed class ListWindow : Window
         var immediate = false;
         foreach (var entry in this.entries)
         {
+            if (entry.IsPlaceholder)
+                continue;
+
             if (entry.IsDead && !this.readiness.ContainsKey(entry.EntityId))
             {
                 immediate = true;
@@ -550,7 +649,7 @@ public sealed class ListWindow : Window
 
         foreach (var entry in this.entries)
         {
-            if (!entry.IsDead)
+            if (entry.IsPlaceholder || !entry.IsDead)
                 continue;
 
             this.seenDead.Add(entry.EntityId);
