@@ -9,7 +9,8 @@ party: The Hunt, the Diadem, Eureka, Bozja and the Occult Crescent. Bodies stack
 of each other in those places and clicking the right one is miserable.
 
 This is not a list of everyone in the zone. It only lists players you can select and
-interact with. For a full zone roster, use Wholist.
+interact with. For a full zone roster, use
+[Wholist](https://github.com/Blooym/Dalamud.Wholist).
 
 <img src="images/screenshot.jpg" alt="The list in the Occult Crescent" width="294">
 
