@@ -43,6 +43,12 @@ public sealed class ListWindow : Window
     private DateTime anchorChangedAt = DateTime.MinValue;
     private bool anchorDirty;
     private Vector2 lastSeenAnchor;
+    private DateTime lastDriftLog = DateTime.MinValue;
+
+    // The size PreDraw last asked for. Kept so the log can show it next to the size
+    // ImGui actually kept; CalcWindowSize cannot simply be called again from Draw,
+    // because it corrects for a font scale that is not applied yet in PreDraw.
+    private Vector2 lastAskedSize;
     private bool positionIsOurs;
 
     // Pinning is suspended only while shift could actually move the window. Locked, it
@@ -144,14 +150,19 @@ public sealed class ListWindow : Window
         // Sized explicitly rather than with AlwaysAutoResize, which fits the window to the
         // previous frame's content. That lag offsets any pinned corner except the top left.
         var size = this.CalcWindowSize();
+        this.lastAskedSize = size;
         ImGui.SetNextWindowSize(size, ImGuiCond.Always);
 
         if (this.centerRequested)
         {
             var viewport = ImGui.GetMainViewport();
             var center = viewport.Pos + (viewport.Size * 0.5f);
-            ImGui.SetNextWindowPos(center - (size * 0.5f), ImGuiCond.Always);
-            this.anchor = null;
+            var topLeft = center - (size * 0.5f);
+            ImGui.SetNextWindowPos(topLeft, ImGuiCond.Always);
+
+            // Worked out from the position just set rather than read back next frame,
+            // so centring cannot adopt ImGui's rounding as the new corner.
+            this.anchor = topLeft + (size * this.Pivot);
             this.centerRequested = false;
             this.positionIsOurs = true;
         }
@@ -196,9 +207,9 @@ public sealed class ListWindow : Window
 
         if (this.visibility == ListVisibility.HiddenByRule || !this.config.ShowWindow || this.entries.Count == 0)
         {
-            return showStrip
+            return Whole(showStrip
                 ? new Vector2(stripWidth, stripHeight) + chrome
-                : new Vector2(1f, 1f) + chrome;
+                : new Vector2(1f, 1f) + chrome);
         }
 
         var box = CalcBoxSize(scale, lineHeight);
@@ -213,8 +224,14 @@ public sealed class ListWindow : Window
             height += stripHeight + spacing.Y;
         }
 
-        return new Vector2(width, height) + chrome;
+        return Whole(new Vector2(width, height) + chrome);
     }
+
+    // ImGui floors window position and size to whole pixels, so a fractional size is
+    // not the size it stores. Rounding up here keeps what we ask for and what it keeps
+    // in step, and stops box edges landing on half pixels at fractional scales.
+    private static Vector2 Whole(Vector2 size)
+        => new(MathF.Ceiling(size.X), MathF.Ceiling(size.Y));
 
     public override void PostDraw() => ImGui.PopStyleVar(3);
 
@@ -332,12 +349,19 @@ public sealed class ListWindow : Window
 
     public override void Draw()
     {
-        // Re-derive the pinned corner from where the window actually ended up, but only
-        // when the plugin placed it or the user is dragging it. Otherwise a frame where
-        // pinning was suspended would hand back a drifted corner and save it.
-        if (this.positionIsOurs || this.dragLatch)
+        // A drag is the only thing that moves the window somewhere the plugin did not
+        // choose, so it is the only case allowed to read the corner back from ImGui.
+        if (this.dragLatch)
         {
             this.anchor = ImGui.GetWindowPos() + (ImGui.GetWindowSize() * this.Pivot);
+            this.PersistAnchor(this.anchor.Value);
+        }
+        else if (this.positionIsOurs && this.anchor.HasValue)
+        {
+            // The plugin placed the window itself this frame, so it already knows the
+            // corner. Asking ImGui where it landed feeds that rounding straight back
+            // in: on an axis whose pivot is 1 the corner loses a pixel per frame, and
+            // the window walks off across the screen at sixty pixels a second.
             this.PersistAnchor(this.anchor.Value);
         }
 
@@ -692,6 +716,16 @@ public sealed class ListWindow : Window
             || Math.Abs(this.lastSeenAnchor.X - value.X) > 0.5f
             || Math.Abs(this.lastSeenAnchor.Y - value.Y) > 0.5f)
         {
+            // A corner that never holds still never reaches the save below, so a window
+            // drifting every frame used to leave no trace at all. That is the one thing
+            // this log exists to catch, so report it while it happens, once a second.
+            if (this.config.LogAnchorChanges && this.anchorDirty
+                && (DateTime.UtcNow - this.lastDriftLog).TotalMilliseconds >= 1000)
+            {
+                this.lastDriftLog = DateTime.UtcNow;
+                this.LogAnchor("drifting", value);
+            }
+
             this.anchorDirty = true;
             this.lastSeenAnchor = value;
             this.anchorChangedAt = DateTime.UtcNow;
@@ -705,19 +739,26 @@ public sealed class ListWindow : Window
         // part is usually whether Shift was held, since Shift makes the whole window
         // grabbable and the game uses Shift for plenty of other things.
         if (this.config.LogAnchorChanges)
-        {
-            var io = ImGui.GetIO();
-            var viewport = ImGui.GetMainViewport();
-            Service.Log.Information(
-                $"[anchor] {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F0},{value.Y:F0} " +
-                $"shift={io.KeyShift} drag={this.dragLatch} size={ImGui.GetWindowSize().X:F0}x{ImGui.GetWindowSize().Y:F0} " +
-                $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
-        }
+            this.LogAnchor("settled", value);
 
         this.config.AnchorX = value.X;
         this.config.AnchorY = value.Y;
         this.config.Save();
         this.anchorDirty = false;
+    }
+
+    // The interesting part is usually whether Shift was held, since Shift makes the
+    // whole window grabbable and the game uses Shift for plenty of other things.
+    private void LogAnchor(string what, Vector2 value)
+    {
+        var io = ImGui.GetIO();
+        var viewport = ImGui.GetMainViewport();
+        var size = ImGui.GetWindowSize();
+        Service.Log.Information(
+            $"[anchor] {what} {this.config.AnchorX:F0},{this.config.AnchorY:F0} -> {value.X:F2},{value.Y:F2} " +
+            $"shift={io.KeyShift} drag={this.dragLatch} pivot={this.Pivot.X:F0},{this.Pivot.Y:F0} " +
+            $"size={size.X:F2}x{size.Y:F2} asked={this.lastAskedSize.X:F2}x{this.lastAskedSize.Y:F2} " +
+            $"viewport={viewport.Size.X:F0}x{viewport.Size.Y:F0} entries={this.entries.Count}");
     }
 
     private static IDisposable ImRaiiTooltip()
