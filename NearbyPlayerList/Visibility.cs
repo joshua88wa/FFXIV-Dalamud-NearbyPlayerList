@@ -47,6 +47,12 @@ public static class ZoneClassifier
         [28] = ZoneCategory.Raid,            // Ultimate
         [37] = ZoneCategory.AllianceRaid,    // Chaotic Alliance Raid
         [21] = ZoneCategory.DeepDungeon,
+
+        // Every Gold Saucer activity: Leap of Faith, Air Force One, Mahjong, the Triple
+        // Triad tournament and parlor, Blunderville, Keybound Brawler. Their intended
+        // use values are scattered, so the content type is the only thing that gathers
+        // them. Nothing dies in any of them, so they behave like a city.
+        [19] = ZoneCategory.CityInn,
         [23] = ZoneCategory.FieldOperation,  // Diadem
         [26] = ZoneCategory.FieldOperation,  // Eureka
         [29] = ZoneCategory.FieldOperation,  // Save the Queen, Bozja
@@ -62,6 +68,10 @@ public static class ZoneClassifier
         [6] = ZoneCategory.CityInn,
         [13] = ZoneCategory.Housing,
         [14] = ZoneCategory.Housing,
+
+        // The Gold Saucer squares: the main one, Chocobo Square, Blunderville Square and
+        // Keybound Square. Not to be confused with content type 23 above, the Diadem.
+        [23] = ZoneCategory.CityInn,
     };
 
     // Content member type 4 is the 24 man alliance layout, which is what separates a
@@ -134,7 +144,7 @@ public static class ZoneClassifier
     public static string Label(ZoneCategory category) => category switch
     {
         ZoneCategory.Overworld => "Overworld",
-        ZoneCategory.CityInn => "Cities and inns",
+        ZoneCategory.CityInn => "Cities, inns and the Gold Saucer",
         ZoneCategory.Housing => "Housing",
         ZoneCategory.Dungeon => "Dungeons",
         ZoneCategory.Trial => "Trials",

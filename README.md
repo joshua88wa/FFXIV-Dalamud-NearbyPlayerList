@@ -76,7 +76,8 @@ Open with `/npl config`, or from the plugin installer.
 
 - Show the player list
 - Hide the list: never, in combat, out of combat, weapon drawn, or weapon sheathed
-- Change visibility by zone. Each of overworld, cities and inns, housing, dungeons,
+- Change visibility by zone. Each of overworld, cities and inns (which covers the Gold
+  Saucer and its minigames, since nothing fights or dies there either), housing, dungeons,
   trials, 8 player raids, 24 player alliance raids, Deep Dungeon, Field Operations and
   everything else can be set to show, hide, or follow the default, with an optional
   filter mode override. The tab shows which category you are currently in.
