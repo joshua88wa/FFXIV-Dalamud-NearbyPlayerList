@@ -1,3 +1,5 @@
+[![AI-DECLARATION: copilot](https://img.shields.io/badge/%E4%B7%BC%20AI--DECLARATION-copilot-fee2e2?labelColor=fee2e2)](https://ai-declaration.md)
+
 # Nearby Player List
 
 A Dalamud plugin for FINAL FANTASY XIV. It shows a compact, clickable list of the
@@ -234,7 +236,7 @@ the raise status IDs were cross-checked. No code from it is used here. This is a
 independent implementation, which is why this plugin can be 0BSD while RezPls is
 AGPL-3.0.
 
-Written with the help of an LLM, in case that matters to you.
+How AI was used in this project is described in [AI-DECLARATION.md](AI-DECLARATION.md).
 
 ## Building
 
