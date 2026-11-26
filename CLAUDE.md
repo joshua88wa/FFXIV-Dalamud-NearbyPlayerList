@@ -10,6 +10,22 @@ Crescent, the Hunt, Diadem).
 fine to make locally; the point of working here rather than in the chat window
 is that changes get reviewed before they reach GitHub.
 
+## AI declaration
+
+This repo follows the AI-DECLARATION.md format (https://github.com/DimwitLabs/AI-DECLARATION.md).
+`AI-DECLARATION.md` at the repo root states how much AI is involved: global level
+`copilot`, with a level per process (design, implementation, testing, documentation,
+review, deployment).
+
+- Keep it accurate. If the way work gets done changes (Joshua writes a part himself, or
+  something runs without his approval), say so and propose an update. Never raise or
+  lower a level on your own.
+- The global `level` must equal the highest level used anywhere in the file. Process
+  keys are limited to the six names above. Unlisted processes count as `none`.
+- `version` is the version of the AI-DECLARATION spec (currently "0.1.1"). It is not the
+  plugin version, so it is not one of the places that bump on a release.
+- Keep the `## Notes` section in plain language and true to how the work is done.
+
 ## The two-repo setup
 
 This repo holds the **code**. The plugin's **distribution manifest** lives in a
